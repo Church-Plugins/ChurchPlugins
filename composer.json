@@ -1,6 +1,6 @@
 {
     "name": "skillfulplugins/toolbox",
     "description": "Common utility and helper functions.",
-    "version" : "1.0.0",
+    "version" : "0.0.1",
     "license" : "GPL-2.0"
 }
