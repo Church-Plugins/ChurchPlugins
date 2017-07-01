@@ -6,5 +6,10 @@
     "require": {
         "php": ">=5.3.0"
     },
-    "minimum-stability": "dev"
+    "minimum-stability": "dev",
+    "autoload": {
+        "psr-4": {
+            "Toolbox\\": "vendor/skillfulplugins/toolbox"
+        }
+    }
 }
