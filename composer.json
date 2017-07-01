@@ -1,6 +1,10 @@
 {
     "name": "skillfulplugins/toolbox",
     "description": "Common utility and helper functions.",
-    "version" : "0.0.1",
-    "license" : "GPL-2.0"
+    "version" : "0.0.2",
+    "license" : "GPL-2.0",
+    "require": {
+        "php": ">=5.3.0"
+    },
+    "minimum-stability": "dev"
 }
