@@ -1,6 +1,6 @@
 <?php
 /**
- * SkillfulPlugins Plugin Framework
+ * ChurchPlugins Plugin Framework
  *
  * This source file is subject to the GNU General Public License v3.0
  * that is bundled with this package in the file license.txt.
@@ -8,13 +8,13 @@
  * http://www.gnu.org/licenses/gpl-3.0.html
  */
 
-namespace SkillfulPlugins\RequestAPI;
+namespace ChurchPlugins\RequestAPI;
 
-use SkillfulPlugins\Helpers;
+use ChurchPlugins\Helpers;
 
 defined( 'ABSPATH' ) or exit;
 
-if ( ! class_exists( 'SkillfulPlugins\RequestAPI\RequestXML' ) ) :
+if ( ! class_exists( 'ChurchPlugins\RequestAPI\RequestXML' ) ) :
 
 /**
  * Base XML API request class.

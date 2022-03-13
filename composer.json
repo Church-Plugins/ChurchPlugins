@@ -1,5 +1,5 @@
 {
-    "name": "skillfulplugins/toolbox",
+    "name": "churchplugins/toolbox",
     "description": "Common utility and helper functions.",
     "version" : "1.0.2",
     "license" : "GPL-2.0",
@@ -9,7 +9,7 @@
     "minimum-stability": "dev",
     "autoload": {
         "psr-4": {
-            "SkillfulPlugins\\": ""
+            "ChurchPlugins\\": ""
         }
     }
 }

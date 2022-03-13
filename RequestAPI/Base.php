@@ -1,6 +1,6 @@
 <?php
 /**
- * SkillfulPlugins Plugin Framework
+ * ChurchPlugins Plugin Framework
  *
  * This source file is subject to the GNU General Public License v3.0
  * that is bundled with this package in the file license.txt.
@@ -8,16 +8,16 @@
  * http://www.gnu.org/licenses/gpl-3.0.html
  */
 
-namespace SkillfulPlugins\RequestAPI;
+namespace ChurchPlugins\RequestAPI;
 
-use SkillfulPlugins\Helpers;
+use ChurchPlugins\Helpers;
 
 defined( 'ABSPATH' ) or exit;
 
-if ( ! class_exists( '\SkillfulPlugins\RequestAPI\Base' ) ) :
+if ( ! class_exists( '\ChurchPlugins\RequestAPI\Base' ) ) :
 
 /**
- * # SkillfulPlugins Plugin Framework API Base Class
+ * # ChurchPlugins Plugin Framework API Base Class
  *
  * This class provides a standardized framework for constructing an API wrapper
  * to external services. It is designed to be extremely flexible.
@@ -201,7 +201,7 @@ abstract class Base {
 	 * throw an exception if the response code is not 200.
 	 *
 	 * A child class implementing this method should simply return true if the response
-	 * processing should continue, or throw a \SkillfulPlugins\RequestAPI\Exception with a
+	 * processing should continue, or throw a \ChurchPlugins\RequestAPI\Exception with a
 	 * relevant error message & code to stop processing.
 	 *
 	 * Note: Child classes *must* sanitize the raw response body before throwing
@@ -221,7 +221,7 @@ abstract class Base {
 	 * exist in the parsed response.
 	 *
 	 * A child class implementing this method should simply return true if the response
-	 * processing should continue, or throw a \SkillfulPlugins\RequestAPI\Exception with a
+	 * processing should continue, or throw a \ChurchPlugins\RequestAPI\Exception with a
 	 * relevant error message & code to stop processing.
 	 *
 	 * Note: Response body sanitization is handled automatically
@@ -293,7 +293,7 @@ abstract class Base {
 		 *     @type string $headers response HTTP headers
 		 *     @type string $body response body
 		 * }
-		 * @param \SkillfulPlugins\RequestAPI\Base $this instance
+		 * @param \ChurchPlugins\RequestAPI\Base $this instance
 		 */
 		do_action( 'sc_' . $this->get_api_id() . '_api_request_performed', $request_data, $response_data, $this );
 	}
@@ -352,7 +352,7 @@ abstract class Base {
 		 *
 		 * @since 1.0.0
 		 * @param string $uri current request URI
-		 * @param \SkillfulPlugins\RequestAPI\Base class instance
+		 * @param \ChurchPlugins\RequestAPI\Base class instance
 		 */
 		return apply_filters( 'sc_' . $this->get_api_id() . '_api_request_uri', $uri, $this );
 	}
@@ -423,7 +423,7 @@ abstract class Base {
 		 *
 		 * @since 1.0.0
 		 * @param array $args request arguments
-		 * @param \SkillfulPlugins\RequestAPI\Base class instance
+		 * @param \ChurchPlugins\RequestAPI\Base class instance
 		 */
 		return apply_filters( 'sc_' . $this->get_api_id() . '_http_request_args', $args, $this );
 	}

@@ -1,6 +1,6 @@
 <?php
 /**
- * SkillfulPlugins Plugin Framework
+ * ChurchPlugins Plugin Framework
  *
  * This source file is subject to the GNU General Public License v3.0
  * that is bundled with this package in the file license.txt.
@@ -8,11 +8,11 @@
  * http://www.gnu.org/licenses/gpl-3.0.html
  */
 
-namespace SkillfulPlugins\RequestAPI;
+namespace ChurchPlugins\RequestAPI;
 
 defined( 'ABSPATH' ) or exit;
 
-if ( ! interface_exists( '\SkillfulPlugins\RequestAPI\InterfaceRequest' ) ) :
+if ( ! interface_exists( '\ChurchPlugins\RequestAPI\InterfaceRequest' ) ) :
 
 /**
  * API Request

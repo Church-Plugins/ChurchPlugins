@@ -1,6 +1,6 @@
 <?php
 /**
- * SkillfulPlugins Plugin Framework
+ * ChurchPlugins Plugin Framework
  *
  * This source file is subject to the GNU General Public License v3.0
  * that is bundled with this package in the file license.txt.
@@ -8,11 +8,11 @@
  * http://www.gnu.org/licenses/gpl-3.0.html
  */
 
-namespace SkillfulPlugins;
+namespace ChurchPlugins;
 
 defined( 'ABSPATH' ) or exit;
 
-if ( ! class_exists( 'SkillfulPlugins\Helpers' ) ) :
+if ( ! class_exists( 'ChurchPlugins\Helpers' ) ) :
 
 	/**
 	 * SkyVerge Helper Class
@@ -399,9 +399,9 @@ if ( ! class_exists( 'SkillfulPlugins\Helpers' ) ) :
 		 *
 		 * @param        $array
 		 * @param        $key
-		 * @param string $default
+		 * @param string | array $default
 		 *
-		 * @return string
+		 * @return string | array
 		 */
 		public static function get_param( $array, $key, $default = '' ) {
 			$value = $default;
