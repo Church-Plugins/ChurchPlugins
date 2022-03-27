@@ -196,7 +196,9 @@ abstract class PostType {
 
 		add_action( "deleted_post", [ $this, 'delete_post' ] );
 		add_action( 'cp_register_post_types', [ $this, 'register_post_type' ] );
-		add_filter( 'cp_app_vars', [ $this, 'app_vars' ] );
+
+		// legacy from CP Library
+		add_filter( 'cpl_app_vars', [ $this, 'app_vars' ] );
 	}
 
 	/**
