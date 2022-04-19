@@ -83,6 +83,26 @@ class Init {
 	/** Actions ***************************************************/
 
 	/**
+	 * Determine if needed tables are installed
+	 *
+	 * @return bool
+	 * @since  1.0.0
+	 *
+	 * @author Tanner Moushey
+	 */
+	public function is_installed() {
+		$tables = $this->get_registered_tables();
+
+		foreach ( $tables as $table ) {
+			if ( ! @$table->installed() ) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
 	 * Post-install actions
 	 *
 	 * - Make sure database is installed and up-to-date
