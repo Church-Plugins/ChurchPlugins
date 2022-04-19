@@ -70,7 +70,7 @@ abstract class Table {
 	 * @author Tanner Moushey
 	 */
 	public function get_version() {
-		return 1;
+		return 2;
 	}
 
 	/**
