@@ -24,7 +24,6 @@ class Source extends Table  {
 		global $wpdb;
 
 		$this->type = 'source';
-		$this->post_type = 'cp_speaker';
 
 		parent::init();
 

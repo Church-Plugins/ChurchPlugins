@@ -45,6 +45,38 @@ class SourceMeta extends Table  {
 	}
 
 	/**
+	 * SQL to update ENUM values for meta keys
+	 *
+	 * @return string
+	 * @since  1.0.0
+	 *
+	 * @author Tanner Moushey
+	 */
+	public function update_enum_sql() {
+		$keys = "'" . implode( "', '", self::get_keys() ) . "'";
+		return "ALTER TABLE " . $this->table_name . " MODIFY COLUMN key ENUM( $keys );";
+	}
+	
+	/**
+	 *
+	 * @return null
+	 * @since  1.0.0
+	 *
+	 * @author Tanner Moushey
+	 */
+	public function maybe_update() {
+		global $wpdb;
+		require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
+
+		$sql = $this->update_enum_sql();
+
+		$wpdb->query( $sql );
+//		dbDelta( $sql );
+
+		$this->updated_table();
+	}
+	
+	/**
 	 * Create the table
 	 *
 	 * @since   1.0.0
