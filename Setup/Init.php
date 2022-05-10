@@ -3,6 +3,7 @@
 namespace ChurchPlugins\Setup;
 
 use ChurchPlugins;
+use ChurchPlugins\Setup\Tables\Log;
 use ChurchPlugins\Setup\Tables\Source;
 use ChurchPlugins\Setup\Tables\SourceMeta;
 use ChurchPlugins\Setup\Tables\SourceType;
@@ -77,7 +78,7 @@ class Init {
 	 * @author Tanner Moushey
 	 */
 	protected function get_registered_tables() {
-		return apply_filters( 'cp_registered_tables', [ Source::get_instance(), SourceMeta::get_instance(), SourceType::get_instance() ] );
+		return apply_filters( 'cp_registered_tables', [ Log::get_instance(), Source::get_instance(), SourceMeta::get_instance(), SourceType::get_instance() ] );
 	}
 
 	/** Actions ***************************************************/
