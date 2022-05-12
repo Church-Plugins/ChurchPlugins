@@ -6,17 +6,18 @@
  * Copyright (C) 2018 Varun A P
  */
 
+@use "sass:color";
+
 .toastify {
-    padding: 12px 20px;
-    color: #ffffff;
+    padding: var(--cp-ui--gap-y-x);
+    color: var(--cp-color-text-inverted);
     display: inline-block;
-    box-shadow: 0 3px 6px -1px rgba(0, 0, 0, 0.12), 0 10px 36px -4px rgba(77, 96, 232, 0.3);
-    background: -webkit-linear-gradient(315deg, #73a5ff, #5477f5);
-    background: linear-gradient(135deg, #73a5ff, #5477f5);
+    box-shadow: var(--cp-box-shadow);
+    background: var(--cp-color-ui-info);
     position: fixed;
     opacity: 0;
     transition: all 0.4s cubic-bezier(0.215, 0.61, 0.355, 1);
-    border-radius: 2px;
+    border-radius: var(--cp-border-radius);
     cursor: pointer;
     text-decoration: none;
     max-width: calc(50% - 20px);
@@ -75,5 +76,15 @@
         left: 0;
         right: 0;
         max-width: fit-content;
+    }
+}
+
+.cp-toast {
+    &--error {
+        background: var(--cp-color-ui-danger);
+    }
+
+    &--success {
+        background: var(--cp-color-ui-success);
     }
 }

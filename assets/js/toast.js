@@ -16,10 +16,9 @@ const Toast = {
    * @returns Toastify
    */
   error : ( text, options = {} ) => {
-    options = parseOptions( options );
     options.className = 'cp-toast--error cp-toast';
     options.text = text;
-    options.duration = -1;
+//    options.duration = -1;
     
     let toast = Toastify(options);
     toast.showToast();
