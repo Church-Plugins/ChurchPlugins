@@ -38,6 +38,9 @@
 	--cp-grid--xl: 1280px;
 	--cp-grid--xxl: 1920px;
 	
+	--cp-gap-base: 8px;
+	--cp-gap--large: 16px;
+	
 	--cp-ui--gap-y: .75em;
 	--cp-ui--gap-x: 1.5em;
 	--cp-ui--gap-y-x: var(--cp-ui--gap-y) var(--cp-ui--gap-x);
@@ -46,7 +49,8 @@
 
 	--cp-border-radius-sm: 2px;
 	--cp-border-radius: 4px;
-	--cp-border-radius-lg: 6px;
+	--cp-border-radius-lg: 20px;
+	--cp-border-radius-round: 100px;
 }
 
 $grid-breakpoints: () !default;
