@@ -81,6 +81,10 @@ abstract class Taxonomy {
 			throw new Exception( "No configuration present for this Taxonomy" );
 			return;
 		}
+		
+		if ( empty( $this->get_object_types() ) ) {
+			return;
+		}
 
 		register_taxonomy( $this->taxonomy, $this->get_object_types(), $args );
 	}
@@ -102,6 +106,12 @@ abstract class Taxonomy {
 
 			foreach( $set_terms as $name ) {
 				$index = array_search( $name, $terms );
+				
+				// if we didn't find the item as a value, check it as a key
+				if ( false === $index && array_key_exists( $name, $terms ) ) {
+					$index = $name;
+				}
+				
 				$terms = array_merge( [ $index => $name ], $terms );
 			}
 		}
@@ -118,6 +128,12 @@ abstract class Taxonomy {
 	 * @author costmo
 	 */
 	public function register_metaboxes() {
+		
+		// only register if we have object types
+		if ( empty( $this->get_object_types() ) ) {
+			return;
+		}
+		
 		$terms = $this->get_terms_for_metabox();
 
 		$args = apply_filters( "{$this->taxonomy}_metabox_args", [

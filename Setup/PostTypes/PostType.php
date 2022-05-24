@@ -154,7 +154,7 @@ abstract class PostType {
 			'show_in_menu' => true,
 			'show_in_rest' => true,
 			'has_archive'  => $slug,
-			'hierarchical' => true,
+			'hierarchical' => false,
 			'label'        => $single,
 			'rewrite'      => [
 				'slug' => $slug
