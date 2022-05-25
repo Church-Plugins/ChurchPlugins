@@ -151,7 +151,7 @@ abstract class PostType {
 
 		return [
 			'public'       => true,
-			'show_in_menu' => true,
+			'show_in_menu' => $this->show_in_menu(),
 			'show_in_rest' => true,
 			'has_archive'  => $slug,
 			'hierarchical' => false,
@@ -176,6 +176,10 @@ abstract class PostType {
 				'parent'             => 'Parent ' . $single
 			]
 		];
+	}
+	
+	public function show_in_menu() {
+		return apply_filters( "{$this->post_type}_show_in_menu", true );
 	}
 
 	/**
