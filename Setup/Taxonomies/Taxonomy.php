@@ -144,17 +144,17 @@ abstract class Taxonomy {
 			'show_names'   => false,
 			'priority'     => 'default',
 			'closed'       => false,
-		] );
+		], $this );
 
 		$cmb = new_cmb2_box( $args );
 
-		$cmb->add_field( [
+		$cmb->add_field( apply_filters( "{$this->taxonomy}_metabox_field_args", [
 			'name'              => sprintf( __( 'Assign %s', 'cp-library' ), $this->plural_label ),
 			'id'                => $this->taxonomy,
 			'type'              => 'multicheck',
 			'select_all_button' => false,
 			'options'           => $terms
-		] );
+		], $this ) );
 	}
 
 	/**
