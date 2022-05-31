@@ -246,7 +246,7 @@ abstract class PostType {
 		try {
 			// this will save the item to our custom table if it does not already exist
 			$model = $this->model::get_instance_from_origin( $post_id );
-			$model->update( [ 'title' => get_the_title( $post_id ) ] );
+			$model->update( [ 'title' => get_post( $post_id )->post_title ] );
 		} catch( Exception $e ) {
 			error_log( $e->getMessage() );
 			return false;
