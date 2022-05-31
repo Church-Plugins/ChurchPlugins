@@ -400,7 +400,6 @@ abstract class Table {
 	 * @param $column
 	 *
 	 * @return bool
-	 * @throws Exception
 	 * @since  1.0.0
 	 *
 	 * @author Tanner Moushey
@@ -408,11 +407,7 @@ abstract class Table {
 	public function delete_all_meta( $value, $column ) {
 		global $wpdb;
 
-		if ( false === $wpdb->query( $wpdb->prepare( "DELETE FROM " . $this->meta_table_name . " WHERE `{$column}` = %s", $value ) ) ) {
-			throw new Exception( sprintf( 'The row (%d) was not deleted.', absint( $this->id ) ) );
-		}
-
-		return true;
+		return $wpdb->query( $wpdb->prepare( "DELETE FROM " . $this->meta_table_name . " WHERE `{$column}` = %s", $value ) );
 	}
 
 	/**
