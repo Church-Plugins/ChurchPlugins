@@ -267,6 +267,10 @@ abstract class PostType {
 			return;
 		}
 
+		if ( get_post_type( $post_id ) !== $this->post_type ) {
+			return;	
+		}
+		
 		try {
 			$model = $this->model::get_instance_from_origin( $post_id );
 			$model->delete();
