@@ -151,6 +151,12 @@ abstract class Table {
 		return new $class( $object );
 	}
 
+	public static function search( $column, $value ) {
+		global $wpdb;
+
+		return $wpdb->get_results( $wpdb->prepare( "SELECT * FROM " . static::get_prop('table_name' ) . " WHERE %s LIKE %s;", $column, $value ) );
+	}
+
 
 	/**
 	 * Get things started
