@@ -218,7 +218,7 @@ abstract class Taxonomy {
 			'hierarchical'          => false,
 			'labels'                => $labels,
 			'show_ui'               => false,
-			'show_admin_column'     => false,
+			'show_admin_column'     => true,
 			'query_var'             => true,
 			'rewrite'               => array( 'slug' => strtolower( $this->plural_label ) ),
 		);
