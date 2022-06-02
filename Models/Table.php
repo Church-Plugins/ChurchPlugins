@@ -214,7 +214,7 @@ abstract class Table {
 	 */
 	public function get_meta_column_defaults() {
 		return array(
-			'item_id' => $this->id,
+			$this->type . '_id' => $this->id,
 			'updated' => date( 'Y-m-d H:i:s' ),
 		);
 	}
@@ -335,7 +335,7 @@ abstract class Table {
 	 * @author Tanner Moushey
 	 */
 	public function update_meta_value( $key, $value ) {
-		$data = [ 'key' => $key, 'value' => $value, 'item_id' => $this->id ];
+		$data = [ 'key' => $key, 'value' => $value, $this->type . '_id' => $this->id ];
 		return $this->update_meta( $data );
 	}
 
@@ -392,7 +392,8 @@ abstract class Table {
 	public function delete_meta( $value, $column = 'key' ) {
 		global $wpdb;
 
-		if ( false === $wpdb->query( $wpdb->prepare( "DELETE FROM " . $this->meta_table_name . " WHERE `item_id` = %d AND `{$column}` = %s", $this->id, $value ) ) ) {
+		
+		if ( false === $wpdb->query( $wpdb->prepare( "DELETE FROM " . $this->meta_table_name . " WHERE `{$this->type}_id` = %d AND `{$column}` = %s", $this->id, $value ) ) ) {
 			throw new Exception( sprintf( 'The row (%d) was not deleted.', absint( $this->id ) ) );
 		}
 
