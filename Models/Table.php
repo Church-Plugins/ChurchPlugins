@@ -372,6 +372,8 @@ abstract class Table {
 			$result = $wpdb->insert_id;
 		}
 
+		wp_cache_delete( $this->id, $this->cache_group . '_meta' );
+
 		static::set_last_changed();
 
 		return $result;
