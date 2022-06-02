@@ -377,9 +377,43 @@ abstract class Table {
 		return $result;
 	}
 
-	public function get_meta_value( $key ) {
-		global $wpdb;
-		return $wpdb->get_var( $wpdb->prepare( "SELECT `value` FROM " . static::get_prop('meta_table_name' ) . " WHERE `key` = %s AND {$this->type}_id = %d LIMIT 1;", $key, $this->id ) );
+	/**
+	 * Get meta value for object
+	 * 
+	 * @param $key
+	 * @param $default
+	 *
+	 * @return mixed|string|void|null
+	 * @since  1.0.0
+	 *
+	 * @author Tanner Moushey
+	 */
+	public function get_meta_value( $key, $default = '' ) {
+		
+		if ( $check = apply_filters( "get_{$this->cache_group}_metadata", null, $key, $this ) ) {
+			return $check;
+		} 
+		
+		$meta_cache = wp_cache_get( $this->id, $this->cache_group . '_meta' );
+
+		if ( ! $meta_cache ) {
+			global $wpdb;
+
+			$meta_list = $wpdb->get_var( $wpdb->prepare( "SELECT id, `key`, `value` FROM " . static::get_prop( 'meta_table_name' ) . " WHERE {$this->type}_id = %d LIMIT 1;", $key, $this->id ) );
+			
+			$meta_cache = [];
+			foreach( $meta_list as $meta ) {
+				$meta_cache[ $meta->key ] = $meta->value;
+			}
+			
+			wp_cache_add( $this->id, $meta_cache, $this->cache_group . '_meta' );
+		}
+		
+		if ( isset( $meta_cache[ $key ] ) ) {
+			return maybe_unserialize( $meta_cache[ $key ] );
+		}
+		
+		return $default;
 	}
 
 	/**
