@@ -177,7 +177,7 @@ abstract class PostType {
 			]
 		];
 	}
-	
+
 	public function show_in_menu() {
 		return apply_filters( "{$this->post_type}_show_in_menu", true );
 	}
@@ -196,7 +196,10 @@ abstract class PostType {
 		add_action( "save_post_{$this->post_type}", [ $this, 'save_post' ] );
 		add_filter( 'cmb2_override_meta_save', [ $this, 'meta_save_override' ], 10, 4 );
 		add_filter( 'cmb2_override_meta_remove', [ $this, 'meta_save_override' ], 10, 4 );
-		add_filter( 'cmb2_override_meta_value', [ $this, 'meta_get_override' ], 10, 4 );
+
+		if ( empty( $_GET['cpl-recovery'] ) ) {
+			add_filter( 'cmb2_override_meta_value', [ $this, 'meta_get_override' ], 10, 4 );
+		}
 
 		add_action( "deleted_post", [ $this, 'delete_post' ] );
 		add_action( 'cp_register_post_types', [ $this, 'register_post_type' ] );
@@ -268,9 +271,9 @@ abstract class PostType {
 		}
 
 		if ( get_post_type( $post_id ) !== $this->post_type ) {
-			return;	
+			return;
 		}
-		
+
 		try {
 			$model = $this->model::get_instance_from_origin( $post_id );
 			$model->delete();
