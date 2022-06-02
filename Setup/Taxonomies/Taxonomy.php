@@ -151,7 +151,7 @@ abstract class Taxonomy {
 		$cmb->add_field( apply_filters( "{$this->taxonomy}_metabox_field_args", [
 			'name'              => sprintf( __( 'Assign %s', 'cp-library' ), $this->plural_label ),
 			'id'                => $this->taxonomy,
-			'type'              => 'multicheck',
+			'type'              => 'pw_multiselect',
 			'select_all_button' => false,
 			'options'           => $terms
 		], $this ) );
