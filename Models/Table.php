@@ -68,7 +68,7 @@ abstract class Table {
 	public function init() {
 		global $wpdb;
 
-		$this->cache_group = $this->type;
+		$this->cache_group = $this->post_type;
 		$this->table_name  = $wpdb->prefix . CP_LIBRARY_UPREFIX . '_' . $this->type;
 		$this->meta_table_name  = $wpdb->prefix . CP_LIBRARY_UPREFIX . '_' . $this->type . "_meta";
 		$this->primary_key = 'id';
@@ -399,7 +399,7 @@ abstract class Table {
 		if ( ! $meta_cache ) {
 			global $wpdb;
 
-			$meta_list = $wpdb->get_var( $wpdb->prepare( "SELECT id, `key`, `value` FROM " . static::get_prop( 'meta_table_name' ) . " WHERE {$this->type}_id = %d LIMIT 1;", $key, $this->id ) );
+			$meta_list = $wpdb->get_results( $wpdb->prepare( "SELECT id, `key`, `value` FROM " . static::get_prop( 'meta_table_name' ) . " WHERE {$this->type}_id = %d;", $this->id ) );
 			
 			$meta_cache = [];
 			foreach( $meta_list as $meta ) {
@@ -433,6 +433,8 @@ abstract class Table {
 		if ( false === $wpdb->query( $wpdb->prepare( "DELETE FROM " . $this->meta_table_name . " WHERE `{$this->type}_id` = %d AND `{$column}` = %s", $this->id, $value ) ) ) {
 			throw new Exception( sprintf( 'The row (%d) was not deleted.', absint( $this->id ) ) );
 		}
+		
+		wp_cache_delete( $this->id, $this->cache_group . '_meta' );
 
 		return true;
 	}
@@ -450,6 +452,8 @@ abstract class Table {
 	 */
 	public function delete_all_meta( $value, $column ) {
 		global $wpdb;
+
+		wp_cache_delete( $this->id, $this->cache_group . '_meta' );
 
 		return $wpdb->query( $wpdb->prepare( "DELETE FROM " . $this->meta_table_name . " WHERE `{$column}` = %s", $value ) );
 	}
@@ -470,6 +474,8 @@ abstract class Table {
 		if ( false === $wpdb->query( $wpdb->prepare( "DELETE FROM " . static::get_prop('table_name' ) . " WHERE " . static::get_prop('primary_key' ) . " = %d", $this->id ) ) ) {
 			throw new Exception( sprintf( 'The row (%d) was not deleted.', absint( $this->id ) ) );
 		}
+
+		wp_cache_delete( $this->id, $this->cache_group . '_meta' );
 
 		do_action( 'cp_post_delete_after', $this );
 

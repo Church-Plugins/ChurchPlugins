@@ -49,6 +49,8 @@ class Source extends Table  {
 			throw new Exception( sprintf( 'The row (%d) was not deleted.', absint( $this->id ) ) );
 		}
 
+		wp_cache_delete( $this->id, $this->cache_group . '_meta' );
+
 		return true;
 	}
 
