@@ -85,6 +85,8 @@ if ( ! class_exists( 'ChurchPlugins', false ) ) {
 			$this->l10ni18n();
 
 			ChurchPlugins\Setup\Init::get_instance();
+
+			ChurchPlugins\Integrations\CMB2\Init::get_instance();
 		}
 
 		/**
