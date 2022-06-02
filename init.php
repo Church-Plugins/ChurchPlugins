@@ -75,12 +75,16 @@ if ( ! class_exists( 'ChurchPlugins', false ) ) {
 		 */
 		public function include() {
 
+			require_once( CHURCHPLUGINS_DIR . 'vendor/autoload.php' );
+			require_once( CHURCHPLUGINS_DIR . 'CMB2/init.php' );
+			
 			if ( ! defined( 'CHURCHPLUGINS_DIR' ) ) {
 				define( 'CHURCHPLUGINS_DIR', trailingslashit( dirname( __FILE__ ) ) );
 			}
 
-			require_once( CHURCHPLUGINS_DIR . 'vendor/autoload.php' );
-			require_once( CHURCHPLUGINS_DIR . 'CMB2/init.php' );
+			if ( ! defined( 'CHURCHPLUGINS_URL' ) ) {
+				define( 'CHURCHPLUGINS_URL', trailingslashit( CMB2_Utils::get_url_from_dir( CHURCHPLUGINS_DIR ) ) );
+			}
 
 			$this->l10ni18n();
 

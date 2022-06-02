@@ -194,7 +194,7 @@ class Init {
 	 * Enqueue scripts and styles
 	 */
 	public function setup_admin_scripts() {
-		$asset_path = CHURCHPLUGINS_DIR . 'Integrations/CMB2';
+		$asset_path = CHURCHPLUGINS_URL . 'Integrations/CMB2';
 
 		wp_register_script( 'pw-select2', $asset_path . '/js/select2.min.js', array( 'jquery-ui-sortable' ), '4.0.3' );
 		wp_enqueue_script( 'pw-select2-init', $asset_path . '/js/script.js', array( 'cmb2-scripts', 'pw-select2' ), self::VERSION );
