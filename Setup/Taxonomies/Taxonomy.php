@@ -31,6 +31,13 @@ abstract class Taxonomy {
 	public $plural_label = '';
 
 	/**
+	 * The type of field to use for the admin
+	 * 
+	 * @var string 
+	 */
+	public $field_type = 'pw_multiselect';
+
+	/**
 	 * An array of metabox definitions
 	 *
 	 * @var array
@@ -151,7 +158,7 @@ abstract class Taxonomy {
 		$cmb->add_field( apply_filters( "{$this->taxonomy}_metabox_field_args", [
 			'name'              => sprintf( __( 'Assign %s', 'cp-library' ), $this->plural_label ),
 			'id'                => $this->taxonomy,
-			'type'              => 'pw_multiselect',
+			'type'              => $this->field_type,
 			'select_all_button' => false,
 			'options'           => $terms
 		], $this ) );
