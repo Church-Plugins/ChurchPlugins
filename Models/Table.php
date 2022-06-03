@@ -111,11 +111,19 @@ abstract class Table {
 			throw new Exception( 'The post type for the provided ID is not correct.' );
 		}
 
-		$object = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM " . static::get_prop('table_name' ) . " WHERE origin_id = %s LIMIT 1;", $origin_id ) );
+		$object = wp_cache_get( $origin_id, static::get_prop( 'cache_group' ) . '_origin' );
 
 		if ( ! $object ) {
-			$data = [ 'origin_id' => $origin_id, 'status' => get_post_status( $origin_id ) ];
-			return static::insert( $data );
+			$object = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM " . static::get_prop( 'table_name' ) . " WHERE origin_id = %s LIMIT 1;", $origin_id ) );
+
+			// if object does not exist, create it
+			if ( ! $object ) {
+				$data   = [ 'origin_id' => $origin_id, 'status' => get_post_status( $origin_id ) ];
+				$object = static::insert( $data );
+			}
+
+			wp_cache_add( $object->id, $object, static::get_prop( 'cache_group' ) );
+			wp_cache_add( $origin_id, $object, static::get_prop( 'cache_group' ) . '_origin' );
 		}
 
 		$class = get_called_class();
@@ -142,10 +150,20 @@ abstract class Table {
 			return new $class();
 		}
 
-		$object = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM " . static::get_prop('table_name' ) . " WHERE id = %s LIMIT 1;", $id ) );
+		$object = wp_cache_get( $id, static::get_prop( 'cache_group' ) );
 
 		if ( ! $object ) {
-			throw new Exception( 'Could not find object.' );
+			$object = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM " . static::get_prop( 'table_name' ) . " WHERE id = %s LIMIT 1;", $id ) );
+
+			if ( ! $object ) {
+				throw new Exception( 'Could not find object.' );
+			}
+
+			wp_cache_add( $id, $object, static::get_prop( 'cache_group' ) );
+
+			if ( property_exists( $object, 'origin_id' ) ) {
+				wp_cache_add( $object->origin_id, $object, static::get_prop( 'cache_group' ) . '_origin' );
+			}
 		}
 
 		return new $class( $object );
@@ -319,6 +337,7 @@ abstract class Table {
 			throw new Exception( sprintf( 'The row (%d) was not updated.', absint( $row_id ) ) );
 		}
 
+		$this->delete_cache();
 		static::set_last_changed();
 
 		do_action( 'cp_post_update', $data, $this );
@@ -372,7 +391,7 @@ abstract class Table {
 			$result = $wpdb->insert_id;
 		}
 
-		wp_cache_delete( $this->id, $this->cache_group . '_meta' );
+		wp_cache_delete( $this->id, static::get_prop( 'cache_group' ) . '_meta' );
 
 		static::set_last_changed();
 
@@ -381,7 +400,7 @@ abstract class Table {
 
 	/**
 	 * Get meta value for object
-	 * 
+	 *
 	 * @param $key
 	 * @param $default
 	 *
@@ -391,30 +410,30 @@ abstract class Table {
 	 * @author Tanner Moushey
 	 */
 	public function get_meta_value( $key, $default = '' ) {
-		
-		if ( $check = apply_filters( "get_{$this->cache_group}_metadata", null, $key, $this ) ) {
+
+		if ( $check = apply_filters( "get_" . static::get_prop( 'cache_group' ) . "_metadata", null, $key, $this ) ) {
 			return $check;
-		} 
-		
-		$meta_cache = wp_cache_get( $this->id, $this->cache_group . '_meta' );
+		}
+
+		$meta_cache = wp_cache_get( $this->id, static::get_prop( 'cache_group' ) . '_meta' );
 
 		if ( ! $meta_cache ) {
 			global $wpdb;
 
 			$meta_list = $wpdb->get_results( $wpdb->prepare( "SELECT id, `key`, `value` FROM " . static::get_prop( 'meta_table_name' ) . " WHERE {$this->type}_id = %d;", $this->id ) );
-			
+
 			$meta_cache = [];
 			foreach( $meta_list as $meta ) {
 				$meta_cache[ $meta->key ] = $meta->value;
 			}
-			
-			wp_cache_add( $this->id, $meta_cache, $this->cache_group . '_meta' );
+
+			wp_cache_add( $this->id, $meta_cache, static::get_prop( 'cache_group' ) . '_meta' );
 		}
-		
+
 		if ( isset( $meta_cache[ $key ] ) ) {
 			return maybe_unserialize( $meta_cache[ $key ] );
 		}
-		
+
 		return $default;
 	}
 
@@ -435,8 +454,8 @@ abstract class Table {
 		if ( false === $wpdb->query( $wpdb->prepare( "DELETE FROM " . $this->meta_table_name . " WHERE `{$this->type}_id` = %d AND `{$column}` = %s", $this->id, $value ) ) ) {
 			throw new Exception( sprintf( 'The row (%d) was not deleted.', absint( $this->id ) ) );
 		}
-		
-		wp_cache_delete( $this->id, $this->cache_group . '_meta' );
+
+		wp_cache_delete( $this->id, static::get_prop( 'cache_group' ) . '_meta' );
 
 		return true;
 	}
@@ -455,7 +474,7 @@ abstract class Table {
 	public function delete_all_meta( $value, $column ) {
 		global $wpdb;
 
-		wp_cache_delete( $this->id, $this->cache_group . '_meta' );
+		wp_cache_delete( $this->id, static::get_prop( 'cache_group' ) . '_meta' );
 
 		return $wpdb->query( $wpdb->prepare( "DELETE FROM " . $this->meta_table_name . " WHERE `{$column}` = %s", $value ) );
 	}
@@ -477,11 +496,28 @@ abstract class Table {
 			throw new Exception( sprintf( 'The row (%d) was not deleted.', absint( $this->id ) ) );
 		}
 
-		wp_cache_delete( $this->id, $this->cache_group . '_meta' );
+
+		$this->delete_cache();
+		wp_cache_delete( $this->id, static::get_prop( 'cache_group' ) . '_meta' );
 
 		do_action( 'cp_post_delete_after', $this );
 
 		return true;
+	}
+
+	/**
+	 * Delete the cache for this object
+	 *
+	 * @since  1.0.0
+	 *
+	 * @author Tanner Moushey
+	 */
+	public function delete_cache() {
+		wp_cache_delete( $this->id, static::get_prop( 'cache_group' ) );
+
+		if ( property_exists( $this, 'origin_id' ) ) {
+			wp_cache_delete( $this->origin_id, static::get_prop( 'cache_group' ) . '_origin' );
+		}
 	}
 
 	/**
