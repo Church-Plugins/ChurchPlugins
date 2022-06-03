@@ -12,7 +12,7 @@ if ( ! class_exists( 'ChurchPlugins', false ) ) {
 	 * @license   GPL-2.0+
 	 */
 	class ChurchPlugins {
-//test
+
 		/**
 		 * Current version number
 		 *
