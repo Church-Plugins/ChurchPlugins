@@ -521,6 +521,23 @@ abstract class Table {
 	}
 
 	/**
+	 * Update the cache for this object
+	 *
+	 * @since  1.0.0
+	 *
+	 * @author Tanner Moushey
+	 */
+	public function update_cache() {
+		$this->delete_cache();
+
+		wp_cache_add( $this->id, $this, static::get_prop( 'cache_group' ) );
+
+		if ( property_exists( $this, 'origin_id' ) ) {
+			wp_cache_add( $this->origin_id, $this, static::get_prop( 'cache_group' ) . '_origin' );
+		}
+	}
+
+	/**
 	 * Sets the last_changed cache key for customers.
 	 *
 	 * @since  1.0
