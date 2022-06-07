@@ -58,6 +58,13 @@ abstract class Table {
 	protected $cache_group;
 
 	/**
+	 * ID of the cache group to use for the origin_id cache
+	 *
+	 * @var string
+	 */
+	protected $cache_group_origin;
+
+	/**
 	 * ID of the current post
 	 *
 	 * @var
@@ -69,6 +76,7 @@ abstract class Table {
 		global $wpdb;
 
 		$this->cache_group = $this->post_type;
+		$this->cache_group_origin = $this->cache_group . '_origin';
 		$this->table_name  = $wpdb->prefix . CP_LIBRARY_UPREFIX . '_' . $this->type;
 		$this->meta_table_name  = $wpdb->prefix . CP_LIBRARY_UPREFIX . '_' . $this->type . "_meta";
 		$this->primary_key = 'id';
@@ -111,10 +119,11 @@ abstract class Table {
 			throw new Exception( 'The post type for the provided ID is not correct.' );
 		}
 
-		$object = wp_cache_get( $origin_id, static::get_prop( 'cache_group' ) . '_origin' );
+		$object = wp_cache_get( $origin_id, static::get_prop( 'cache_group_origin' ) );
 
 		if ( ! $object ) {
-			$object = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM " . static::get_prop( 'table_name' ) . " WHERE origin_id = %s LIMIT 1;", $origin_id ) );
+			$sql = apply_filters( 'cp_instance_from_origin_sql', $wpdb->prepare( "SELECT * FROM " . static::get_prop( 'table_name' ) . " WHERE origin_id = %s LIMIT 1;", $origin_id ), $origin_id, get_called_class() );
+			$object = $wpdb->get_row( $sql );
 
 			// if object does not exist, create it
 			if ( ! $object ) {
@@ -123,7 +132,7 @@ abstract class Table {
 			}
 
 			wp_cache_add( $object->id, $object, static::get_prop( 'cache_group' ) );
-			wp_cache_add( $origin_id, $object, static::get_prop( 'cache_group' ) . '_origin' );
+			wp_cache_add( $origin_id, $object, static::get_prop( 'cache_group_origin' ) );
 		}
 
 		$class = get_called_class();
@@ -162,7 +171,7 @@ abstract class Table {
 			wp_cache_add( $id, $object, static::get_prop( 'cache_group' ) );
 
 			if ( property_exists( $object, 'origin_id' ) ) {
-				wp_cache_add( $object->origin_id, $object, static::get_prop( 'cache_group' ) . '_origin' );
+				wp_cache_add( $object->origin_id, $object, static::get_prop( 'cache_group_origin' ) );
 			}
 		}
 
@@ -516,7 +525,7 @@ abstract class Table {
 		wp_cache_delete( $this->id, static::get_prop( 'cache_group' ) );
 
 		if ( property_exists( $this, 'origin_id' ) ) {
-			wp_cache_delete( $this->origin_id, static::get_prop( 'cache_group' ) . '_origin' );
+			wp_cache_delete( $this->origin_id, static::get_prop( 'cache_group_origin' ) );
 		}
 	}
 
@@ -533,7 +542,7 @@ abstract class Table {
 		wp_cache_add( $this->id, $this, static::get_prop( 'cache_group' ) );
 
 		if ( property_exists( $this, 'origin_id' ) ) {
-			wp_cache_add( $this->origin_id, $this, static::get_prop( 'cache_group' ) . '_origin' );
+			wp_cache_add( $this->origin_id, $this, static::get_prop( 'cache_group_origin' ) );
 		}
 	}
 
