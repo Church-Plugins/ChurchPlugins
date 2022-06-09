@@ -421,6 +421,9 @@ if ( ! class_exists( 'ChurchPlugins\Helpers' ) ) :
 				case 'type' :
 					$markup = '<span class="material-icons-outlined">view_list</span>';
 					break;
+				case 'filter' :
+					$markup = '<span class="material-icons-outlined">tune</span>';
+					break;
 			}
 
 			return apply_filters( 'cp_get_icon', $markup, $icon );
