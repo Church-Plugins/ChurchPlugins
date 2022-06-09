@@ -395,6 +395,38 @@ if ( ! class_exists( 'ChurchPlugins\Helpers' ) ) :
 		/** Misc functions ****************************************************/
 
 		/**
+		 * @param $icon
+		 *
+		 * @since  1.0.0
+		 *
+		 * @author Tanner Moushey
+		 */
+		public static function get_icon( $icon ) {
+			$markup = '';
+
+			switch( $icon ) {
+				case 'date' :
+					$markup = '<span class="material-icons-outlined">calendar_today</span>';
+					break;
+				case 'topics' :
+					$markup = '<span class="material-icons-outlined">sell</span>';
+					break;
+				case 'scripture' :
+					$markup = '<span class="material-icons-outlined">menu_book</span>';
+					break;
+				case 'speaker' :
+					$markup = '<span class="material-icons-outlined">person</span>';
+					break;
+				case 'series' :
+				case 'type' :
+					$markup = '<span class="material-icons-outlined">view_list</span>';
+					break;
+			}
+
+			return apply_filters( 'cp_get_icon', $markup, $icon );
+		}
+
+		/**
 		 * Helper function to get array parameters when they might not exist
 		 *
 		 * @param        $array

@@ -82,6 +82,7 @@ if ( ! class_exists( 'ChurchPlugins', false ) ) {
 			require_once( CHURCHPLUGINS_DIR . 'vendor/autoload.php' );
 			require_once( CHURCHPLUGINS_DIR . 'CMB2/init.php' );
 			require_once( CHURCHPLUGINS_DIR . 'CMB2/includes/CMB2_Utils.php' );
+			require_once( CHURCHPLUGINS_DIR . 'Helpers.php' );
 
 			if ( ! defined( 'CHURCHPLUGINS_URL' ) ) {
 				define( 'CHURCHPLUGINS_URL', trailingslashit( CMB2_Utils::get_url_from_dir( CHURCHPLUGINS_DIR ) ) );
