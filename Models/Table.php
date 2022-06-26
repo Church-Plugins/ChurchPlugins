@@ -16,6 +16,13 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 abstract class Table {
 
 	/**
+	 * The prefix to the database table
+	 *
+	 * @since   1.0
+	 */
+	protected $prefix;
+
+	/**
 	 * The name of our database table
 	 *
 	 * @since   1.0
@@ -75,10 +82,11 @@ abstract class Table {
 	public function init() {
 		global $wpdb;
 
+		$this->prefix = apply_filters( 'cp_table_prefix', $wpdb->base_prefix, $this );
 		$this->cache_group = $this->post_type;
 		$this->cache_group_origin = $this->cache_group . '_origin';
-		$this->table_name  = $wpdb->prefix . CP_LIBRARY_UPREFIX . '_' . $this->type;
-		$this->meta_table_name  = $wpdb->prefix . CP_LIBRARY_UPREFIX . '_' . $this->type . "_meta";
+		$this->table_name  = $this->prefix . 'cp_' . $this->type;
+		$this->meta_table_name  = $this->prefix . 'cp_' . $this->type . "_meta";
 		$this->primary_key = 'id';
 	}
 

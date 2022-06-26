@@ -193,7 +193,6 @@ abstract class PostType {
 
 		add_action( 'rest_cp_item_query', [ $this, 'rest_request_limit' ], 10, 1 );
 		add_action( "save_post_{$this->post_type}", [ $this, 'save_post' ] );
-		add_action( "save_post_{$this->post_type}", [ $this, 'save_post' ] );
 		add_filter( 'cmb2_override_meta_save', [ $this, 'meta_save_override' ], 10, 4 );
 		add_filter( 'cmb2_override_meta_remove', [ $this, 'meta_save_override' ], 10, 4 );
 

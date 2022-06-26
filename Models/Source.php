@@ -21,15 +21,9 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 class Source extends Table  {
 
 	public function init() {
-		global $wpdb;
-
 		$this->type = 'source';
 
 		parent::init();
-
-		$this->table_name  = $wpdb->prefix . 'cp_' . $this->type;
-		$this->meta_table_name  = $wpdb->prefix . 'cp_' . $this->type . "_meta";
-
 	}
 
 	/**
