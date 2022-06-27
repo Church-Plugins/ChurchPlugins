@@ -192,7 +192,7 @@ abstract class PostType {
 		add_action( 'cmb2_admin_init', [ $this, 'register_metaboxes' ] );
 
 		add_action( 'rest_cp_item_query', [ $this, 'rest_request_limit' ], 10, 1 );
-		add_action( "save_post_{$this->post_type}", [ $this, 'save_post' ] );
+		add_action( "save_post", [ $this, 'maybe_save_post' ] );
 		add_filter( 'cmb2_override_meta_save', [ $this, 'meta_save_override' ], 10, 4 );
 		add_filter( 'cmb2_override_meta_remove', [ $this, 'meta_save_override' ], 10, 4 );
 
@@ -230,6 +230,24 @@ abstract class PostType {
 	}
 
 	/**
+	 * Wrapper instead of using "save_post_{post_type}" so we can hook into "save_post" before this in other places
+	 *
+	 * @param $post_id
+	 *
+	 * @return bool|\ChurchPlugins\Models\Item|\ChurchPlugins\Models\ItemType|\ChurchPlugins\Models\Source
+	 * @since  1.0.0
+	 *
+	 * @author Tanner Moushey
+	 */
+	public function maybe_save_post( $post_id ) {
+		if ( get_post_type( $post_id ) !== $this->post_type ) {
+			return false;
+		}
+
+		return $this->save_post( $post_id );
+	}
+
+	/**
 	 * Save post to our custom table
 	 *
 	 * @param $post_id
@@ -241,7 +259,7 @@ abstract class PostType {
 	 */
 	public function save_post( $post_id ) {
 
-		if ( 'auto-draft' == get_post_status( $post_id ) || ! $this->model ) {
+		if ( 'auto-draft' == get_post_status( $post_id ) || wp_is_post_revision( $post_id ) || wp_is_post_autosave( $post_id ) || ! $this->model ) {
 			return false;
 		}
 
