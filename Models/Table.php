@@ -114,7 +114,8 @@ abstract class Table {
 	public static function get_instance_from_origin( $origin_id ) {
 		global $wpdb;
 
-		$origin_id = absint( $origin_id );
+		$origin_id = apply_filters( 'cp_origin_id', absint( $origin_id ) );
+
 		if ( ! $origin_id ) {
 			return false;
 		}
@@ -127,19 +128,29 @@ abstract class Table {
 			throw new Exception( 'The post type for the provided ID is not correct.' );
 		}
 
-		if ( 'auto-draft' == get_post_status( $origin_id )  ) {
+		$post_status = get_post_status( $origin_id );
+		if ( 'auto-draft' == $post_status ) {
 			throw new Exception( 'No instance retrieved for auto-draft' );
 		}
 
 		$object = wp_cache_get( $origin_id, static::get_prop( 'cache_group_origin' ) );
 
 		if ( ! $object ) {
-			$sql = apply_filters( 'cp_instance_from_origin_sql', $wpdb->prepare( "SELECT * FROM " . static::get_prop( 'table_name' ) . " WHERE origin_id = %s LIMIT 1;", $origin_id ), $origin_id, get_called_class() );
+
+			/**
+			 * Allow filtering the used ID in case we need to set it to another site on a multisite
+			 *
+			 * Warning: if this filter is used, then the provided ID will belong to another blog and will not provide
+			 * the correct data if the post is accessed without switching to that blog
+			 */
+			$queried_id = apply_filters( 'cp_origin_id_sql', $origin_id );
+
+			$sql = apply_filters( 'cp_instance_from_origin_sql', $wpdb->prepare( "SELECT * FROM " . static::get_prop( 'table_name' ) . " WHERE origin_id = %s LIMIT 1;", $queried_id ), $queried_id, $origin_id, get_called_class() );
 			$object = $wpdb->get_row( $sql );
 
 			// if object does not exist, create it
 			if ( ! $object ) {
-				$data   = [ 'origin_id' => $origin_id, 'status' => get_post_status( $origin_id ) ];
+				$data   = [ 'origin_id' => $queried_id, 'status' => $post_status ];
 				$object = static::insert( $data );
 			}
 
