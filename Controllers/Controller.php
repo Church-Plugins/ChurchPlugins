@@ -37,9 +37,14 @@ class Controller {
 			$this->model = $use_origin ? $class::get_instance_from_origin( $id ) : $class::get_instance( $id );
 		}
 
-		// allow for filtering this origin id in case we are on a subsite or some other reason
-		$origin_id  = apply_filters( 'cp_controller_origin_id', $this->model->origin_id, $use_origin, $this );
-		$this->post = get_post( $origin_id );
+		// allow for filtering the associated post in case we are on a subsite or some other reason
+		$post = apply_filters( 'cp_controller_post', false, $this->model->origin_id, $use_origin, $this );
+
+		if ( $post ) {
+			$this->post = $post;
+		} else {
+			$this->post = get_post( $this->model->origin_id );
+		}
 	}
 
 	/**
