@@ -38,12 +38,12 @@ class Controller {
 		}
 
 		// allow for filtering the associated post in case we are on a subsite or some other reason
-		$post = apply_filters( 'cp_controller_post', false, $this->model->origin_id, $use_origin, $this );
+		$origin_id = apply_filters( 'cp_controller_origin_id', $this->model->origin_id, $use_origin, $this );
 
-		if ( $post ) {
-			$this->post = $post;
+		if ( $origin_id instanceof \WP_Post ) {
+			$this->post = $origin_id;
 		} else {
-			$this->post = get_post( $this->model->origin_id );
+			$this->post = get_post( $origin_id );
 		}
 	}
 
