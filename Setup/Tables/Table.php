@@ -35,6 +35,13 @@ abstract class Table {
 	public $primary_key;
 
 	/**
+	 * The table prefix
+	 *
+	 * @var
+	 */
+	public $prefix;
+
+	/**
 	 * @var self
 	 */
 	protected static $_instance;
@@ -59,7 +66,10 @@ abstract class Table {
 	 *
 	 * @since   1.0
 	 */
-	public function __construct() {}
+	public function __construct() {
+		global $wpdb;
+		$this->prefix = apply_filters( 'cp_table_prefix', $wpdb->base_prefix, $this );
+	}
 
 	/**
 	 * Current table version
