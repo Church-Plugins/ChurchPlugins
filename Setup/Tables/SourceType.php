@@ -24,12 +24,10 @@ class SourceType extends Table  {
 	 * @since  1.0.0
 	*/
 	public function __construct() {
-		global $wpdb;
-
-		$this->table_name = $wpdb->prefix . 'cp_source_type';
-		$this->version    = '1.0';
-
 		parent::__construct();
+
+		$this->table_name = $this->prefix . 'cp_source_type';
+		$this->version    = '1.0';
 	}
 
 	/**

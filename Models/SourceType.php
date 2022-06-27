@@ -23,13 +23,11 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 class SourceType extends Table  {
 
 	public function init() {
-		global $wpdb;
-
 		$this->type = 'source_type';
 
 		parent::init();
 
-		$this->table_name  = $wpdb->prefix . 'cp_' . $this->type;
+		$this->table_name  = $this->prefix . 'cp_' . $this->type;
 	}
 
 	/**

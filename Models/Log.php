@@ -21,14 +21,11 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 class Log extends Table  {
 
 	public function init() {
-		global $wpdb;
-
 		$this->type = 'log';
 
 		parent::init();
 
-		$this->table_name  = $wpdb->prefix . 'cp_' . $this->type;
-
+		$this->table_name  = $this->prefix . 'cp_' . $this->type;
 	}
 
 	/**
