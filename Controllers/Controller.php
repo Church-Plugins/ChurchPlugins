@@ -54,7 +54,7 @@ class Controller {
 	 * @author Tanner Moushey
 	 */
 	protected function filter( $value, $function ) {
-		return apply_filters( $this->model->post_type . '_' . $function, $value, $this );
+		return apply_filters( $this->model::get_prop('post_type') . '_' . $function, $value, $this );
 	}
 
 }
