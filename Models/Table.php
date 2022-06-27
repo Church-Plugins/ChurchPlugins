@@ -127,6 +127,10 @@ abstract class Table {
 			throw new Exception( 'The post type for the provided ID is not correct.' );
 		}
 
+		if ( 'auto-draft' == get_post_status( $origin_id )  ) {
+			throw new Exception( 'No instance retrieved for auto-draft' );
+		}
+
 		$object = wp_cache_get( $origin_id, static::get_prop( 'cache_group_origin' ) );
 
 		if ( ! $object ) {
