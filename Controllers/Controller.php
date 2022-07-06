@@ -35,10 +35,13 @@ class Controller {
 
 		if ( class_exists( $classname ) ) {
 			$this->model = $use_origin ? $class::get_instance_from_origin( $id ) : $class::get_instance( $id );
+		} else {
+			throw new Exception( 'No model found for ' . $class );
 		}
-
+		
+		
 		// allow for filtering the associated post in case we are on a subsite or some other reason
-		$origin_id = apply_filters( 'cp_controller_origin_id', $this->model->origin_id, $use_origin, $this );
+		$origin_id = apply_filters( 'cp_controller_origin_id', $use_origin ? $id : $this->model->origin_id, $use_origin, $this );
 
 		if ( $origin_id instanceof \WP_Post ) {
 			$this->post = $origin_id;
