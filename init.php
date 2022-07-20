@@ -1,6 +1,6 @@
 <?php
 
-if ( ! class_exists( 'ChurchPlugins', false ) ) {
+if ( ! class_exists( 'ChurchPlugins_102', false ) ) {
 
 	/**
 	 * Handles checking for and loading the newest version of ChurchPlugins
@@ -11,7 +11,7 @@ if ( ! class_exists( 'ChurchPlugins', false ) ) {
 	 * @package   ChurchPlugins
 	 * @license   GPL-2.0+
 	 */
-	class ChurchPlugins {
+	class ChurchPlugins_102 {
 
 		/**
 		 * Current version number
@@ -33,7 +33,7 @@ if ( ! class_exists( 'ChurchPlugins', false ) ) {
 		/**
 		 * Single instance of the ChurchPlugins object
 		 *
-		 * @var ChurchPlugins
+		 * @var ChurchPlugins_102
 		 */
 		public static $single_instance = null;
 
@@ -41,7 +41,7 @@ if ( ! class_exists( 'ChurchPlugins', false ) ) {
 		 * Creates/returns the single instance ChurchPlugins object
 		 *
 		 * @since  1.0.0
-		 * @return ChurchPlugins Single instance object
+		 * @return ChurchPlugins_102 Single instance object
 		 */
 		public static function initiate() {
 			if ( null === self::$single_instance ) {
@@ -64,17 +64,23 @@ if ( ! class_exists( 'ChurchPlugins', false ) ) {
 				return;
 			}
 
-			$this->include();
+			add_action( 'plugins_loaded', [ $this, 'include_churchplugins' ], self::PRIORITY );
 		}
 
 		/**
-		 * A final check if CMB2 exists before kicking off our CMB2 loading.
-		 * CMB2_VERSION and CMB2_DIR constants are set at this point.
+		 * A final check if Church Plugins exists before kicking off our Church Plugins loading.
 		 *
 		 * @since  2.0.0
 		 */
-		public function include() {
+		public function include_churchplugins() {
 
+			// this has already been loaded somewhere else
+			if ( defined( 'CHURCHPLUGINS_VERSION' ) ) {
+				return;
+			}
+			
+			define( 'CHURCHPLUGINS_VERSION', self::VERSION );
+			
 			if ( ! defined( 'CHURCHPLUGINS_DIR' ) ) {
 				define( 'CHURCHPLUGINS_DIR', trailingslashit( dirname( __FILE__ ) ) );
 			}
@@ -123,6 +129,6 @@ if ( ! class_exists( 'ChurchPlugins', false ) ) {
 	}
 
 	// Make it so...
-	ChurchPlugins::initiate();
+	ChurchPlugins_102::initiate();
 
 }// End if().
