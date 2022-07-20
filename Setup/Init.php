@@ -121,7 +121,7 @@ class Init {
 		$installed   = false;
 		$tables      = $this->get_registered_tables();
 
-		$needs_check = apply_filters( 'cp_table_needs_check', ChurchPlugins::VERSION !== $table_check );
+		$needs_check = apply_filters( 'cp_table_needs_check', CHURCHPLUGINS_VERSION !== $table_check );
 
 		if ( $needs_check ) {
 
@@ -137,7 +137,7 @@ class Init {
 				do_action( 'cpl_after_table_created' );
 			}
 
-			update_option( 'cp_table_check', ChurchPlugins::VERSION );
+			update_option( 'cp_table_check', CHURCHPLUGINS_VERSION );
 		}
 
 		foreach ( $tables as $table ) {
