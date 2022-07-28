@@ -405,6 +405,9 @@ if ( ! class_exists( 'ChurchPlugins\Helpers' ) ) :
 			$markup = '';
 
 			switch( $icon ) {
+				case 'location' :
+					$markup = '<span class="material-icons-outlined">location_on</span>';
+					break;
 				case 'date' :
 					$markup = '<span class="material-icons-outlined">calendar_today</span>';
 					break;
