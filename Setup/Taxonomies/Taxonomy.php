@@ -226,6 +226,7 @@ abstract class Taxonomy {
 			'labels'                => $labels,
 			'show_ui'               => false,
 			'show_admin_column'     => true,
+			'show_in_quick_edit'    => true,
 			'query_var'             => true,
 			'rewrite'               => array( 'slug' => strtolower( $this->plural_label ) ),
 		);
