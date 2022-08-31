@@ -437,6 +437,19 @@ if ( ! class_exists( 'ChurchPlugins\Helpers' ) ) :
 		}
 
 		/**
+		 * @param $timestamp
+		 * @param $format
+		 *
+		 * @return mixed|void
+		 * @since  1.0.0
+		 *
+		 * @author Tanner Moushey
+		 */
+		public static function relative_time( $timestamp, $format = '' ) {
+			return apply_filters( 'cp_relative_time', self::calculate_relative_time( $timestamp, $format ), $timestamp, $format );
+		}
+		
+		/**
 		 * Convert timestamp to relative time
 		 * 
 		 * @param $timestamp
@@ -447,7 +460,7 @@ if ( ! class_exists( 'ChurchPlugins\Helpers' ) ) :
 		 *
 		 * @author Tanner Moushey
 		 */
-		public static function relative_time( $timestamp, $format = '' ) {
+		public static function calculate_relative_time( $timestamp, $format = '' ) {
 
 			$format = ! empty( $format ) ? $format : get_option( 'date_format' );
 
