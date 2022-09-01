@@ -64,7 +64,7 @@ class Log extends Table  {
 		}
 
 		return $wpdb->get_results(
-			"SELECT action, COUNT(*) as count FROM " . static::get_prop( 'table_name' ) . $where . ' GROUP BY action'
+			"SELECT action, COUNT(*) as count FROM " . static::get_prop( 'table_name' ) . $where . " GROUP BY action"
 		);
 
 	}
