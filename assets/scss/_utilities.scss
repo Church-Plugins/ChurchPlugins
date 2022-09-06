@@ -1,0 +1,20 @@
+@import "mixins/breakpoints";
+
+.cp-columns {
+	display: flex;
+	flex-direction: row;
+	justify-content: space-between;
+	width: 100%;
+}
+
+@include media-breakpoint-down(md) {
+	.cp-touch-hide {
+		display: none !important;
+	}
+}
+
+@include media-breakpoint-up(lg) {
+	.cp-touch-only {
+		display: none !important;
+	}
+}

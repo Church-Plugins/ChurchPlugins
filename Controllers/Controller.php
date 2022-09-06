@@ -65,4 +65,19 @@ class Controller {
 		return apply_filters( $this->model::get_prop('post_type') . '_' . $function, $value, $this );
 	}
 
+	/**
+	 * Magic getter when we just need to grab a meta field
+	 * 
+	 * @param $name
+	 *
+	 * @return mixed|void
+	 * @since  1.0.2
+	 *
+	 * @author Tanner Moushey
+	 */
+	public function __get( $name ) {
+		$value = get_post_meta( $this->post->ID, $name, true );
+		return $this->filter( $value, "get_$name" );
+	}
+
 }
