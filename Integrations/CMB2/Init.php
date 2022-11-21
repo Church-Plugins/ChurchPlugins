@@ -45,6 +45,8 @@ class Init {
 	 * Initialize the plugin by hooking into CMB2
 	 */
 	protected function __construct() {
+		add_filter( 'cmb2_render_license', array( $this, 'render_license' ), 10, 5 );
+		
 		add_filter( 'cmb2_render_pw_select', array( $this, 'render_pw_select' ), 10, 5 );
 		add_filter( 'cmb2_render_pw_multiselect', array( $this, 'render_pw_multiselect' ), 10, 5 );
 		add_filter( 'cmb2_sanitize_pw_multiselect', array( $this, 'pw_multiselect_sanitize' ), 10, 4 );
@@ -52,6 +54,33 @@ class Init {
 		add_filter( 'cmb2_repeat_table_row_types', array( $this, 'pw_multiselect_table_row_class' ), 10, 1 );
 	}
 
+	public function render_license( $field, $field_escaped_value, $field_object_id, $field_object_type, $field_type_object ) {
+		$desc = $field_type_object->field->args['description'];
+		$field_type_object->field->args['desc'] = $field_type_object->field->args['description'] = '';
+		
+		$args = [];
+		if ( $field->args['is_active'] ) {
+			$args['disabled'] = 'disabled';
+		}
+
+		$render_class = $field_type_object->get_new_render_type( 'text', 'CMB2_Type_Text' );
+		echo $render_class->render( $args );
+		
+		if ( $field->args['nonce'] ) {
+			echo $field->args['nonce'];
+			
+			if ( $field->args['is_active'] ) {
+				echo '<span style="margin: .25rem .5rem;color: #00a32a;" class="dashicons dashicons-yes"></span>';
+			} else {
+				echo '&nbsp;';
+			}
+			submit_button( $field->args['button_text'], $field->args['button_type'], $field->args['button_name'], false );
+		}
+
+		$field_type_object->field->args['desc'] = $field_type_object->field->args['description'] = $desc;
+		echo $render_class->_desc( true );
+	}
+	
 	/**
 	 * Render select box field
 	 */
