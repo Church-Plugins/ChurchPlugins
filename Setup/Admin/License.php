@@ -6,22 +6,22 @@ namespace ChurchPlugins\Setup\Admin;
  * Plugin licensing class
  */
 class License {
-	
+
 	/**
 	 * @var License
 	 */
 	protected static $_instance;
 
 	protected $id;
-	
+
 	protected $store_url;
-	
+
 	protected $plugin_file;
-	
+
 	protected $edd_id;
 
 	protected $settings_url;
-	
+
 	/**
 	 * Class constructor
 	 *
@@ -37,32 +37,32 @@ class License {
 		add_action( 'admin_init', array( $this, 'activate_license' ) );
 		add_action( 'admin_init', array( $this, 'deactivate_license' ) );
 		add_action( 'admin_init', array( $this, 'plugin_updater' ), 5 );
-		
-		add_action( 'admin_notices', [ $this, 'admin_notices' ] );	
-		
+
+		add_action( 'admin_notices', [ $this, 'admin_notices' ] );
+
 	}
 
 	public function is_active() {
 		return 'valid' == $this->get( 'status' );
 	}
-	
+
 	public function get( $key = false, $default = '' ) {
 		$data = get_option( $this->id, [] );
-		
+
 		if ( empty( $key ) ) {
 			return $data;
 		}
-		
+
 		return trim( $data[ $key ] ?? $default );
 	}
-	
+
 	public function update( $key, $value ) {
 		$data = $this->get();
-		
+
 		$data[ $key ] = $value;
 		update_option( $this->id, $data, false );
 	}
-	
+
 	public function get_license_check_slug() {
 		return $this->id . '_license_check';
 	}
@@ -70,7 +70,7 @@ class License {
 	public function get_activate_slug() {
 		return $this->id . '_license_activate';
 	}
-	
+
 	public function get_deactivate_slug() {
 		return $this->id . '_license_deactivate';
 	}
@@ -78,7 +78,7 @@ class License {
 	public function get_nonce_slug() {
 		return $this->id . '_nonce';
 	}
-	
+
 	public function license_field( $cmb ) {
 		$args = [
 			'name'        => 'License Key',
@@ -90,10 +90,10 @@ class License {
 			'button_text' => '',
 			'is_active'   => $this->is_active(),
 		];
-		
+
 		if ( $this->get( 'license' ) ) {
-			$args['nonce'] = wp_nonce_field( $this->get_nonce_slug(), $this->get_nonce_slug() );
-			
+			$args['nonce'] = wp_nonce_field( $this->get_nonce_slug(), $this->get_nonce_slug(), true, false );
+
 			if ( $this->is_active() ) {
 				$args['button_name'] = $this->get_deactivate_slug();
 				$args['button_text'] = __( 'Deactivate License', 'Church Plugins' );
@@ -103,7 +103,7 @@ class License {
 				$args['button_text'] = __( 'Activate License', 'Church Plugins' );
 			}
 		}
-		
+
 		$cmb->add_field( $args );
 	}
 
@@ -142,7 +142,7 @@ class License {
 			'sslverify' => false,
 			'body'      => $api_params
 		) );
-		
+
 		// make sure the response came back okay
 		if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ) {
 
@@ -195,7 +195,7 @@ class License {
 						break;
 				}
 			}
-	
+
 			$this->update( 'status', $license_data->license );
 		}
 
@@ -314,7 +314,7 @@ class License {
 
 				wp_safe_redirect( $redirect );
 				exit();
-			}			
+			}
 
 			$license_data = json_decode( wp_remote_retrieve_body( $response ) );
 
@@ -334,7 +334,7 @@ class License {
 	 */
 	public function plugin_updater() {
 		$data = get_plugin_data( $this->plugin_file );
-		
+
 		// setup the updater
 		new Updater( $this->store_url, $this->plugin_file, array(
 				'version' => $data['Version'],    // current version number
@@ -345,7 +345,7 @@ class License {
 		);
 
 	}
-	
+
 	/**
 	 * This is a means of catching errors from the activation method above and displaying it to the customer
 	 */
