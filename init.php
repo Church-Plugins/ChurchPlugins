@@ -1,6 +1,6 @@
 <?php
 
-if ( ! class_exists( 'ChurchPlugins_105', false ) ) {
+if ( ! class_exists( 'ChurchPlugins_106', false ) ) {
 
 	/**
 	 * Handles checking for and loading the newest version of ChurchPlugins
@@ -11,7 +11,7 @@ if ( ! class_exists( 'ChurchPlugins_105', false ) ) {
 	 * @package   ChurchPlugins
 	 * @license   GPL-2.0+
 	 */
-	class ChurchPlugins_105 {
+	class ChurchPlugins_106 {
 
 		/**
 		 * Current version number
@@ -19,7 +19,7 @@ if ( ! class_exists( 'ChurchPlugins_105', false ) ) {
 		 * @var   string
 		 * @since 1.0.0
 		 */
-		const VERSION = '1.0.5';
+		const VERSION = '1.0.6';
 
 		/**
 		 * Current version hook priority.
@@ -28,20 +28,30 @@ if ( ! class_exists( 'ChurchPlugins_105', false ) ) {
 		 * @var   int
 		 * @since 1.0.0
 		 */
-		const PRIORITY = 9996;
+		const PRIORITY = 9995;
 
 		/**
 		 * Single instance of the ChurchPlugins object
 		 *
-		 * @var ChurchPlugins_105
+		 * @var ChurchPlugins_106
 		 */
 		public static $single_instance = null;
+
+		/**
+		 * @var ChurchPlugins\Setup\Init
+		 */
+		public $setup;
+
+		/**
+		 * @var ChurchPlugins\Admin\_Init
+		 */
+		public $admin;
 
 		/**
 		 * Creates/returns the single instance ChurchPlugins object
 		 *
 		 * @since  1.0.0
-		 * @return ChurchPlugins_105 Single instance object
+		 * @return ChurchPlugins_106 Single instance object
 		 */
 		public static function initiate() {
 			if ( null === self::$single_instance ) {
@@ -85,7 +95,7 @@ if ( ! class_exists( 'ChurchPlugins_105', false ) ) {
 				define( 'CHURCHPLUGINS_DIR', trailingslashit( dirname( __FILE__ ) ) );
 			}
 
-			require_once( CHURCHPLUGINS_DIR . 'vendor/autoload.php' );
+			require_once( CHURCHPLUGINS_DIR . 'Setup/Init.php' );
 			require_once( CHURCHPLUGINS_DIR . 'CMB2/init.php' );
 			require_once( CHURCHPLUGINS_DIR . 'CMB2/includes/CMB2_Utils.php' );
 			require_once( CHURCHPLUGINS_DIR . 'Helpers.php' );
@@ -96,9 +106,12 @@ if ( ! class_exists( 'ChurchPlugins_105', false ) ) {
 
 			$this->l10ni18n();
 
-			ChurchPlugins\Setup\Init::get_instance();
+			$this->setup = ChurchPlugins\Setup\Init::get_instance();
+			$this->admin = ChurchPlugins\Admin\_Init::get_instance();
 
 			ChurchPlugins\Integrations\CMB2\Init::get_instance();
+
+			do_action( 'cp_core_loaded' );
 		}
 
 		/**
@@ -128,7 +141,11 @@ if ( ! class_exists( 'ChurchPlugins_105', false ) ) {
 
 	}
 
-	// Make it so...
-	ChurchPlugins_105::initiate();
+	function churchplugins() {
+		// Make it so...
+		return ChurchPlugins_106::initiate();
+	}
+
+	churchplugins();
 
 }// End if().

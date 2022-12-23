@@ -19,22 +19,9 @@ class Init {
 	protected static $_instance;
 
 	/**
-	 * @var Tables\Init
-	 * @since  1.0.0
-	 *
-	 * @author Tanner Moushey
+	 * @var Customizer\_Init
 	 */
-	public $tables;
-
-	/**
-	 * @var PostTypes\Init;
-	 */
-	public $post_types;
-
-	/**
-	 * @var Taxonomies\Init;
-	 */
-	public $taxonomies;
+	public $customizer;
 
 	/**
 	 * Only make one instance of Init
@@ -63,10 +50,13 @@ class Init {
 	 *
 	 * @return void
 	 */
-	protected function includes() {}
+	protected function includes() {
+		$this->customizer = Customizer\_Init::get_instance();
+	}
 
 	protected function actions() {
 		add_action( 'admin_init', [ $this, 'update_install' ] );
+		add_action( 'admin_enqueue_scripts', [ $this, 'register_scripts'], 5 );
 	}
 
 	/**
@@ -82,6 +72,10 @@ class Init {
 	}
 
 	/** Actions ***************************************************/
+
+	public function register_scripts() {
+		wp_register_script( 'cp-admin-tools-import', CHURCHPLUGINS_URL . 'assets/js/admin/tools/import.js', array( 'jquery', 'jquery-form', 'underscore' ), CHURCHPLUGINS_VERSION  );
+	}
 
 	/**
 	 * Determine if needed tables are installed
