@@ -22,7 +22,7 @@ var ChurchPlugins_Import = {
 
 	before_submit: function( arr, form, options ) {
 		form.find( '.notice-wrap' ).remove();
-		form.append( '<div class="notice-wrap"><div class="edd-progress"><div></div></div></div>' );
+		form.append( '<div class="notice-wrap"><div class="cp-progress"><div></div></div></div>' );
 
 		//check whether client browser fully supports all File API
 		if ( window.File && window.FileReader && window.FileList && window.Blob ) {
@@ -30,7 +30,7 @@ var ChurchPlugins_Import = {
 			// HTML5 File API is supported by browser
 
 		} else {
-			const import_form = jQuery( '.edd-import-form' ).find( '.edd-progress' ).parent().parent();
+			const import_form = jQuery( '.cp-import-form' ).find( '.cp-progress' ).parent().parent();
 			const notice_wrap = import_form.find( '.notice-wrap' );
 
 			import_form.find( '.button:disabled' ).attr( 'disabled', false );
@@ -48,13 +48,13 @@ var ChurchPlugins_Import = {
 			response = jQuery.parseJSON( xhr.responseText );
 
 		if ( response.success ) {
-			const form = jQuery( '.edd-import-form .notice-wrap' ).parent();
+			const form = jQuery( '.cp-import-form .notice-wrap' ).parent();
 
-			form.find( '.edd-import-file-wrap,.notice-wrap' ).remove();
-			form.find( '.edd-import-options' ).slideDown();
+			form.find( '.cp-import-file-wrap,.notice-wrap' ).remove();
+			form.find( '.cp-import-options' ).slideDown();
 
 			// Show column mapping
-			let select = form.find( 'select.edd-import-csv-column' ),
+			let select = form.find( 'select.cp-import-csv-column' ),
 				row = select.parents( 'tr' ).first(),
 				options = '',
 				columns = response.data.columns.sort( function( a, b ) {
@@ -89,11 +89,11 @@ var ChurchPlugins_Import = {
 				jQuery( this ).val( jQuery( this ).attr( 'data-field' ) ).change();
 			} );
 
-			jQuery( document.body ).on( 'click', '.edd-import-proceed', function( e ) {
+			jQuery( document.body ).on( 'click', '.cp-import-proceed', function( e ) {
 				e.preventDefault();
 
-				form.find( '.edd-import-proceed.button-primary' ).addClass( 'updating-message' );
-				form.append( '<div class="notice-wrap"><div class="edd-progress"><div></div></div></div>' );
+				form.find( '.cp-import-proceed.button-primary' ).addClass( 'updating-message' );
+				form.append( '<div class="notice-wrap"><div class="cp-progress"><div></div></div></div>' );
 
 				response.data.mapping = form.serialize();
 
@@ -108,7 +108,7 @@ var ChurchPlugins_Import = {
 		// Something went wrong. This will display error on form
 
 		const response = jQuery.parseJSON( xhr.responseText );
-		const import_form = jQuery( '.edd-import-form' ).find( '.edd-progress' ).parent().parent();
+		const import_form = jQuery( '.cp-import-form' ).find( '.cp-progress' ).parent().parent();
 		const notice_wrap = import_form.find( '.notice-wrap' );
 
 		import_form.find( '.button:disabled' ).attr( 'disabled', false );
@@ -130,14 +130,14 @@ var ChurchPlugins_Import = {
 				class: import_data.class,
 				upload: import_data.upload,
 				mapping: import_data.mapping,
-				action: 'edd_do_ajax_import',
+				action: 'cp_do_ajax_import',
 				step: step,
 			},
 			dataType: 'json',
 			success: function( response ) {
 				if ( 'done' === response.data.step || response.data.error ) {
 					// We need to get the actual in progress form, not all forms on the page
-					const import_form = jQuery( '.edd-import-form' ).find( '.edd-progress' ).parent().parent();
+					const import_form = jQuery( '.cp-import-form' ).find( '.cp-progress' ).parent().parent();
 					const notice_wrap = import_form.find( '.notice-wrap' );
 
 					import_form.find( '.button:disabled' ).attr( 'disabled', false );
@@ -145,7 +145,7 @@ var ChurchPlugins_Import = {
 					if ( response.data.error ) {
 						notice_wrap.html( '<div class="update error"><p>' + response.data.error + '</p></div>' );
 					} else {
-						import_form.find( '.edd-import-options' ).hide();
+						import_form.find( '.cp-import-options' ).hide();
 						jQuery( 'html, body' ).animate( {
 							scrollTop: import_form.parent().offset().top,
 						}, 500 );
@@ -153,7 +153,7 @@ var ChurchPlugins_Import = {
 						notice_wrap.html( '<div class="updated"><p>' + response.data.message + '</p></div>' );
 					}
 				} else {
-					jQuery( '.edd-progress div' ).animate( {
+					jQuery( '.cp-progress div' ).animate( {
 						width: response.data.percentage + '%',
 					}, 50, function() {
 						// Animation complete.

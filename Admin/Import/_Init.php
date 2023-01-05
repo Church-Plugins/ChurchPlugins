@@ -40,10 +40,11 @@ class _Init {
 	 * @return void
 	 */
 	protected function includes() {
+		require_once( 'BatchImport.php' );
 	}
 
 	protected function actions() {
-		add_action( 'cp_upload_import_file', 'edd_do_ajax_import_file_upload' );
+		add_action( 'cp_upload_import_file', [ $this, 'do_ajax_import_file_upload' ] );
 	}
 
 
@@ -56,43 +57,43 @@ class _Init {
 
 		require_once EDD_PLUGIN_DIR . 'includes/admin/import/class-batch-import.php';
 
-		if( ! wp_verify_nonce( $_REQUEST['edd_ajax_import'], 'edd_ajax_import' ) ) {
-			wp_send_json_error( array( 'error' => __( 'Nonce verification failed', 'easy-digital-downloads' ) ) );
+		if( ! wp_verify_nonce( $_REQUEST['cp_ajax_import'], 'cp_ajax_import' ) ) {
+			wp_send_json_error( array( 'error' => __( 'Nonce verification failed', 'church-plugins' ) ) );
 		}
 
-		if( empty( $_POST['edd-import-class'] ) ) {
-			wp_send_json_error( array( 'error' => __( 'Missing import parameters. Import class must be specified.', 'easy-digital-downloads' ), 'request' => $_REQUEST ) );
+		if( empty( $_POST['cp-import-class'] ) ) {
+			wp_send_json_error( array( 'error' => __( 'Missing import parameters. Import class must be specified.', 'church-plugins' ), 'request' => $_REQUEST ) );
 		}
 
-		if( empty( $_FILES['edd-import-file'] ) ) {
-			wp_send_json_error( array( 'error' => __( 'Missing import file. Please provide an import file.', 'easy-digital-downloads' ), 'request' => $_REQUEST ) );
+		if( empty( $_FILES['cp-import-file'] ) ) {
+			wp_send_json_error( array( 'error' => __( 'Missing import file. Please provide an import file.', 'church-plugins' ), 'request' => $_REQUEST ) );
 		}
 
-		if ( empty( $_FILES['edd-import-file']['type'] ) || ! in_array( strtolower( $_FILES['edd-import-file']['type'] ), edd_importer_accepted_mime_types(), true ) ) {
-			wp_send_json_error( array( 'error' => __( 'The file you uploaded does not appear to be a CSV file.', 'easy-digital-downloads' ), 'request' => $_REQUEST ) );
+		if ( empty( $_FILES['cp-import-file']['type'] ) || ! in_array( strtolower( $_FILES['cp-import-file']['type'] ), $this->accepted_mime_types(), true ) ) {
+			wp_send_json_error( array( 'error' => __( 'The file you uploaded does not appear to be a CSV file.', 'church-plugins' ), 'request' => $_REQUEST ) );
 		}
 
-		if( ! file_exists( $_FILES['edd-import-file']['tmp_name'] ) ) {
-			wp_send_json_error( array( 'error' => __( 'Something went wrong during the upload process, please try again.', 'easy-digital-downloads' ), 'request' => $_REQUEST ) );
+		if( ! file_exists( $_FILES['cp-import-file']['tmp_name'] ) ) {
+			wp_send_json_error( array( 'error' => __( 'Something went wrong during the upload process, please try again.', 'church-plugins' ), 'request' => $_REQUEST ) );
 		}
 
 		// Let WordPress import the file. We will remove it after import is complete
-		$import_file = wp_handle_upload( $_FILES['edd-import-file'], array( 'test_form' => false ) );
+		$import_file = wp_handle_upload( $_FILES['cp-import-file'], array( 'test_form' => false ) );
 
 		if ( $import_file && empty( $import_file['error'] ) ) {
 
-			$importer_class   = sanitize_text_field( $_POST['edd-import-class'] );
-			$is_class_allowed = edd_importer_is_class_allowed( $importer_class );
+			$importer_class   = wp_unslash( sanitize_text_field( $_POST['cp-import-class'] ) );
+			$is_class_allowed = $this->is_class_allowed( $importer_class );
 			if ( false === $is_class_allowed ) {
-				wp_send_json_error( array( 'error' => __( 'Invalid importer class supplied', 'easy-digital-downloads' ) ) );
+				wp_send_json_error( array( 'error' => __( 'Invalid importer class supplied', 'church-plugins' ) ) );
 			}
 
-			do_action( 'edd_batch_import_class_include', $importer_class );
+			do_action( 'cp_batch_import_class_include', $importer_class );
 
 			$import = new $importer_class( $import_file['file'] );
 
 			if( ! $import->can_import() ) {
-				wp_send_json_error( array( 'error' => __( 'You do not have permission to import data', 'easy-digital-downloads' ) ) );
+				wp_send_json_error( array( 'error' => __( 'You do not have permission to import data', 'church-plugins' ) ) );
 			}
 
 			wp_send_json_success( array(
@@ -118,4 +119,30 @@ class _Init {
 	}
 
 
+	/**
+	 * Returns the array of accepted mime types for the importer.
+	 *
+	 * @return array
+	 * @since 3.0
+	 */
+	public function accepted_mime_types() {
+		return array(
+			'text/csv',
+			'text/comma-separated-values',
+			'text/plain',
+			'text/anytext',
+			'text/*',
+			'text/plain',
+			'text/anytext',
+			'text/*',
+			'application/csv',
+			'application/excel',
+			'application/vnd.ms-excel',
+			'application/vnd.msexcel',
+		);
+	}
+
+	public function is_class_allowed( $class ) {
+		return in_array( $class, apply_filters( 'cp_importer_is_class_allowed', [] ) );
+	}
 }

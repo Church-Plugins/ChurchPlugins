@@ -559,6 +559,9 @@ if ( ! class_exists( 'ChurchPlugins\Helpers' ) ) :
 				case 'filter' :
 					$markup = '<span class="material-icons-outlined">tune</span>';
 					break;
+				case 'copy' :
+					$markup = '<span class="material-icons-outlined">content_copy</span>';
+					break;
 			}
 
 			return apply_filters( 'cp_get_icon', $markup, $icon );

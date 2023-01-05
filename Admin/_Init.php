@@ -49,11 +49,30 @@ class _Init {
 	}
 
 	protected function actions() {
+		add_action( 'init', [ $this, 'request_actions' ] );
 	}
 
 
 	/** Actions ***************************************************/
 
+	/**
+	 * Handle actions submitted through $_GET and $_POST requests
+	 *
+	 * @since  1.0.6
+	 *
+	 * @author Tanner Moushey
+	 */
+	public function request_actions() {
+		$key = ! empty( $_REQUEST['cp_action'] ) ? sanitize_key( $_REQUEST['cp_action'] ) : false;
+
+		if ( empty( $key ) ) {
+			return;
+		}
+
+		$vars = isset( $_POST['cp_action'] ) ? $_POST : $_GET;
+
+		do_action( "{$key}", $vars );
+	}
 
 
 }
