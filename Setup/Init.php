@@ -51,7 +51,7 @@ class Init {
 	 * @return void
 	 */
 	protected function includes() {
-		$this->customizer = Customizer\_Init::get_instance();
+//		$this->customizer = Customizer\_Init::get_instance();
 	}
 
 	protected function actions() {

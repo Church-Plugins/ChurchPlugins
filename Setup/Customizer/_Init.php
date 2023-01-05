@@ -123,7 +123,7 @@ final class _Init {
 		 * @param string $ID
 		 * @param self   $customizer
 		 */
-		$this->ID = apply_filters( 'cp_customizer_panel_id', 'cp123_customizer', $this );
+		$this->ID = apply_filters( 'cp_customizer_panel_id', 'cp_customizer', $this );
 
 		// Hook the Registering methods
 		add_action( 'customize_register', [ $this, 'register' ], 15 );
