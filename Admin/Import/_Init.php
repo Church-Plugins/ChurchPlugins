@@ -45,6 +45,7 @@ class _Init {
 
 	protected function actions() {
 		add_action( 'cp_upload_import_file', [ $this, 'do_ajax_import_file_upload' ] );
+		add_action( 'wp_ajax_cp_do_ajax_import', [ $this, 'do_ajax_import' ] );
 	}
 
 
@@ -54,8 +55,6 @@ class _Init {
 		if ( ! function_exists( 'wp_handle_upload' ) ) {
 			require_once( ABSPATH . 'wp-admin/includes/file.php' );
 		}
-
-		require_once EDD_PLUGIN_DIR . 'includes/admin/import/class-batch-import.php';
 
 		if( ! wp_verify_nonce( $_REQUEST['cp_ajax_import'], 'cp_ajax_import' ) ) {
 			wp_send_json_error( array( 'error' => __( 'Nonce verification failed', 'church-plugins' ) ) );
@@ -102,7 +101,7 @@ class _Init {
 				'upload'    => $import_file,
 				'first_row' => $import->get_first_row(),
 				'columns'   => $import->get_columns(),
-				'nonce'     => wp_create_nonce( 'edd_ajax_import', 'edd_ajax_import' )
+				'nonce'     => wp_create_nonce( 'cp_ajax_import', 'cp_ajax_import' )
 			) );
 
 		} else {
@@ -118,6 +117,98 @@ class _Init {
 		exit;
 	}
 
+	/**
+	 * Process batch imports via ajax
+	 *
+	 * @return void
+	 * @since 1.0.4
+	 */
+	function do_ajax_import() {
+
+		if ( ! wp_verify_nonce( $_REQUEST['nonce'], 'cp_ajax_import' ) ) {
+			wp_send_json_error( array( 'error'   => __( 'Nonce verification failed', 'church-plugins' ), 'request' => $_REQUEST ) );
+		}
+
+		if ( empty( $_REQUEST['class'] ) ) {
+			wp_send_json_error( array( 'error'   => __( 'Missing import parameters. Import class must be specified.', 'church-plugins' ), 'request' => $_REQUEST ) );
+		}
+
+		if ( ! file_exists( $_REQUEST['upload']['file'] ) ) {
+			wp_send_json_error( array( 'error'   => __( 'Something went wrong during the upload process, please try again.', 'church-plugins' ), 'request' => $_REQUEST ) );
+		}
+
+		$file = sanitize_text_field( $_REQUEST['upload']['file'] );
+
+		$mime_type_allowed = false;
+		if ( is_callable( 'mime_content_type' ) ) {
+			if ( in_array( mime_content_type( $file ), $this->accepted_mime_types(), true ) ) {
+				$mime_type_allowed = true;
+			}
+		} else {
+			if ( wp_check_filetype( $file, $this->accepted_mime_types() ) ) {
+				$mime_type_allowed = true;
+			}
+		}
+
+		if ( false === $mime_type_allowed ) {
+			wp_send_json_error( array( 'error'   => __( 'The file you uploaded does not appear to be a CSV file.', 'church-plugins' ), 'request' => $_REQUEST ) );
+		}
+
+		$importer_class   = wp_unslash( sanitize_text_field( $_REQUEST['class'] ) );
+		$is_class_allowed = $this->is_class_allowed( $importer_class );
+
+		if ( ! $is_class_allowed ) {
+			wp_send_json_error( array( 'error' => __( 'Invalid importer class supplied', 'church-plugins' ) ) );
+		}
+
+		do_action( 'edd_batch_import_class_include', $importer_class );
+
+		$step   = absint( $_REQUEST['step'] );
+		$class  = $importer_class;
+		$import = new $class( $file, $step );
+
+		if ( ! $import->can_import() ) {
+			wp_send_json_error( array( 'error' => __( 'You do not have permission to import data', 'church-plugins' ) ) );
+		}
+
+		parse_str( $_REQUEST['mapping'], $map );
+
+		$import->map_fields( $map['cp-import-field'] );
+
+		$ret = $import->process_step( $step );
+
+		$percentage = $import->get_percentage_complete();
+
+		if ( $ret ) {
+
+			$step += 1;
+			wp_send_json_success( array(
+				'step'       => $step,
+				'percentage' => $percentage,
+				'columns'    => $import->get_columns(),
+				'mapping'    => $import->field_mapping,
+				'total'      => $import->total
+			) );
+
+		} elseif ( true === $import->is_empty ) {
+
+			wp_send_json_error( array(
+				'error' => __( 'No data found for import parameters', 'church-plugins' )
+			) );
+
+		} else {
+
+			wp_send_json_success( array(
+				'step'    => 'done',
+				'message' => sprintf(
+					__( 'Import complete! <a href="%s">View imported %s</a>.', 'church-plugins' ),
+					esc_url( $import->get_list_table_url() ),
+					esc_html( $import->get_import_type_label() )
+				)
+			) );
+
+		}
+	}
 
 	/**
 	 * Returns the array of accepted mime types for the importer.

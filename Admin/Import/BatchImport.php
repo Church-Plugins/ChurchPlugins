@@ -29,6 +29,13 @@ class BatchImport {
 	public $file;
 
 	/**
+	 * The current row we are looking at
+	 *
+	 * @since 1.0.6
+	 */
+	public $row;
+
+	/**
 	 * The parsed CSV file being imported
 	 *
 	 * @since 1.0.6
@@ -214,6 +221,33 @@ class BatchImport {
 	}
 
 	/**
+	 * Get the mapped value for the provided field
+	 *
+	 * @param $key
+	 * @param $row
+	 *
+	 * @return false|mixed
+	 * @since  1.0.6
+	 *
+	 * @author Tanner Moushey
+	 */
+	public function get_field_value( $key, $default = '', $row = [] ) {
+		if ( empty( $row ) ) {
+			$row = $this->row;
+		}
+
+		if ( empty( $this->field_mapping[ $key ] ) ) {
+			return $default;
+		}
+
+		if ( isset( $row[ $this->field_mapping[ $key ] ] ) ) {
+			return $row[ $this->field_mapping[ $key ] ];
+		}
+
+		return $default;
+	}
+
+	/**
 	 * Retrieve the URL to the list table for the import data type
 	 *
 	 * @since 1.0.6
@@ -340,5 +374,151 @@ class BatchImport {
 
 		return $str;
 
+	}
+
+	/**
+	 * Set up and store the Featured Image
+	 *
+	 * @param $post_id
+	 * @param $image
+	 * @param $post_author
+	 *
+	 * @return bool|int
+	 * @since  1.0.6
+	 *
+	 * @author Tanner Moushey
+	 */
+	public function set_image( $post_id = 0, $image = '', $post_author = 0 ) {
+
+		$is_url   = false !== filter_var( $image, FILTER_VALIDATE_URL );
+		$is_local = $is_url && false !== strpos( site_url(), $image );
+		$ext      = $this->get_file_extension( $image );
+
+		if ( $is_url && $is_local ) {
+
+			// Image given by URL, see if we have an attachment already
+			$attachment_id = attachment_url_to_postid( $image );
+
+		} elseif ( $is_url ) {
+
+			if ( ! function_exists( 'media_sideload_image' ) ) {
+
+				require_once( ABSPATH . 'wp-admin/includes/file.php' );
+
+			}
+
+			// Image given by external URL
+			$url = media_sideload_image( $image, $post_id, '', 'src' );
+
+			if ( ! is_wp_error( $url ) ) {
+
+				$attachment_id = attachment_url_to_postid( $url );
+
+			}
+
+
+		} elseif ( false === strpos( $image, '/' ) && $this->get_file_extension( $image ) ) {
+
+			// Image given by name only
+
+			$upload_dir = wp_upload_dir();
+
+			if ( file_exists( trailingslashit( $upload_dir['path'] ) . $image ) ) {
+
+				// Look in current upload directory first
+				$file = trailingslashit( $upload_dir['path'] ) . $image;
+
+			} else {
+
+				// Now look through year/month sub folders of upload directory for files with our image's same extension
+				$files = glob( $upload_dir['basedir'] . '/*/*/*' . $ext );
+				foreach ( $files as $file ) {
+
+					if ( basename( $file ) == $image ) {
+
+						// Found our file
+						break;
+
+					}
+
+					// Make sure $file is unset so our empty check below does not return a false positive
+					unset( $file );
+
+				}
+
+			}
+
+			if ( ! empty( $file ) ) {
+
+				// We found the file, let's see if it already exists in the media library
+
+				$guid          = str_replace( $upload_dir['basedir'], $upload_dir['baseurl'], $file );
+				$attachment_id = attachment_url_to_postid( $guid );
+
+
+				if ( empty( $attachment_id ) ) {
+
+					// Doesn't exist in the media library, let's add it
+
+					$filetype = wp_check_filetype( basename( $file ), null );
+
+					// Prepare an array of post data for the attachment.
+					$attachment = array(
+						'guid'           => $guid,
+						'post_mime_type' => $filetype['type'],
+						'post_title'     => preg_replace( '/\.[^.]+$/', '', $image ),
+						'post_content'   => '',
+						'post_status'    => 'inherit',
+						'post_author'    => $post_author
+					);
+
+					// Insert the attachment.
+					$attachment_id = wp_insert_attachment( $attachment, $file, $post_id );
+
+					// Make sure that this file is included, as wp_generate_attachment_metadata() depends on it.
+					require_once( ABSPATH . 'wp-admin/includes/image.php' );
+
+					// Generate the metadata for the attachment, and update the database record.
+					$attach_data = wp_generate_attachment_metadata( $attachment_id, $file );
+					wp_update_attachment_metadata( $attachment_id, $attach_data );
+
+				}
+
+			}
+
+		}
+
+		if ( ! empty( $attachment_id ) ) {
+
+			return set_post_thumbnail( $post_id, $attachment_id );
+
+		}
+
+		return false;
+
+	}
+
+	/**
+	 * Get File Extension
+	 *
+	 * Returns the file extension of a filename.
+	 *
+	 * @param $str
+	 *
+	 *
+	 * @return false|mixed|string
+	 * @since  1.0.6
+	 *
+	 * @author Tanner Moushey
+	 */
+	public function get_file_extension( $str ) {
+		$parts          = explode( '.', $str );
+		$file_extension = end( $parts );
+
+		if ( false !== strpos( $file_extension, '?' ) ) {
+			$file_extension = substr( $file_extension, 0, strpos( $file_extension, '?' ) );
+		}
+
+		return $file_extension;
 	}
 }

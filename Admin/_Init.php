@@ -45,6 +45,7 @@ class _Init {
 	 * @return void
 	 */
 	protected function includes() {
+		require_once( CHURCHPLUGINS_DIR . 'Admin/Import/_Init.php' );
 		$this->import = Import\_Init::get_instance();
 	}
 

@@ -49,7 +49,7 @@ class Log extends Table  {
 			}
 		}
 
-		return $wpdb->get_results( $wpdb->prepare( "SELECT * FROM " . static::get_prop( 'table_name' ) . $where ) );
+		return $wpdb->get_results( $wpdb->prepare( "SELECT * FROM " . static::get_prop( 'table_name' ) . '%s', $where ) );
 	}
 
 	public static function count_by_action( $args ) {
@@ -63,7 +63,7 @@ class Log extends Table  {
 			}
 		}
 
-		return $wpdb->get_results( $wpdb->prepare( "SELECT action, Count(*) as count FROM " . static::get_prop( 'table_name' ) . $where . ' Group By action' ) );
+		return $wpdb->get_results( $wpdb->prepare( "SELECT action, Count(*) as count FROM " . static::get_prop( 'table_name' ) . ' %s Group By action', $where ) );
 
 	}
 

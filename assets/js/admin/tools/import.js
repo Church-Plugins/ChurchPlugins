@@ -36,7 +36,7 @@ var ChurchPlugins_Import = {
 			import_form.find( '.button:disabled' ).attr( 'disabled', false );
 
 			//Error for older unsupported browsers that doesn't support HTML5 File API
-			notice_wrap.html( '<div class="update error"><p>' + edd_vars.unsupported_browser + '</p></div>' );
+			notice_wrap.html( '<div class="update error"><p>We are sorry but your browser is not compatible with this kind of file upload. Please upgrade your browser.</p></div>' );
 			return false;
 		}
 	},
@@ -93,6 +93,7 @@ var ChurchPlugins_Import = {
 				e.preventDefault();
 
 				form.find( '.cp-import-proceed.button-primary' ).addClass( 'updating-message' );
+				form.find( '.notice-wrap' ).remove();
 				form.append( '<div class="notice-wrap"><div class="cp-progress"><div></div></div></div>' );
 
 				response.data.mapping = form.serialize();
@@ -143,6 +144,7 @@ var ChurchPlugins_Import = {
 					import_form.find( '.button:disabled' ).attr( 'disabled', false );
 
 					if ( response.data.error ) {
+						import_form.find( '.cp-import-proceed.button-primary' ).removeClass( 'updating-message' )
 						notice_wrap.html( '<div class="update error"><p>' + response.data.error + '</p></div>' );
 					} else {
 						import_form.find( '.cp-import-options' ).hide();
@@ -163,6 +165,16 @@ var ChurchPlugins_Import = {
 				}
 			},
 		} ).fail( function( response ) {
+			const import_form = jQuery( '.cp-import-form' ).find( '.cp-progress' ).parent().parent();
+			const notice_wrap = import_form.find( '.notice-wrap' );
+			import_form.find( '.cp-import-proceed.button-primary' ).removeClass( 'updating-message' )
+
+			if ( undefined !== response.responseText ) {
+				notice_wrap.html( '<div class="update error"><p>' + response.responseText + '</p></div>' );
+			} else {
+				notice_wrap.html( '<div class="update error"><p>Something went wrong. Please check your data and try again.</p></div>' );
+			}
+
 			if ( window.console && window.console.log ) {
 				console.log( response );
 			}
