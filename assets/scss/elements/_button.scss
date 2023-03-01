@@ -25,9 +25,11 @@
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
+	text-decoration: none;
 
 	svg, i,
-	.fl-button-text {
+	.fl-button-text,
+	span {
 		color: var(--cp-button--color);
 	}
 
@@ -69,7 +71,8 @@
 		background: var(--cp-button--bg--hover);
 
 		svg, i,
-		.fl-button-text {
+		.fl-button-text,
+		span {
 			color: var(--cp-button--color--hover);
 		}
 	}
