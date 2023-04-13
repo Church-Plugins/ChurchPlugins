@@ -52,6 +52,16 @@ class Init {
 	 */
 	protected function includes() {
 		$this->customizer = Customizer\_Init::get_instance();
+
+		require_once( CHURCHPLUGINS_DIR . 'Setup/PostTypes/PostType.php' );
+
+		require_once( CHURCHPLUGINS_DIR . 'Setup/Tables/Table.php' );
+		require_once( CHURCHPLUGINS_DIR . 'Setup/Tables/Log.php' );
+		require_once( CHURCHPLUGINS_DIR . 'Setup/Tables/Source.php' );
+		require_once( CHURCHPLUGINS_DIR . 'Setup/Tables/SourceMeta.php' );
+		require_once( CHURCHPLUGINS_DIR . 'Setup/Tables/SourceType.php' );
+
+		require_once( CHURCHPLUGINS_DIR . 'Setup/Taxonomies/Taxonomy.php' );
 	}
 
 	protected function actions() {
