@@ -395,6 +395,28 @@ if ( ! class_exists( 'ChurchPlugins\Helpers' ) ) :
 		/** Misc functions ****************************************************/
 
 		/**
+		 * Strip tags and shortcodes for podcast content
+		 *
+		 * @since  1.0.8
+		 *
+		 * @param $content
+		 *
+		 * @return mixed|void
+		 * @author Tanner Moushey, 4/10/23
+		 */
+		public static function podcast_content( $content = '' ) {
+			// Allow some HTML per iTunes spec:
+			// "You can use rich text formatting and some HTML (<p>, <ol>, <ul>, <a>) in the <content:encoded> tag."
+			$content = strip_tags( $content, '<b><strong><i><em><p><ol><ul><a>' );
+
+			$content = strip_shortcodes( $content );
+
+			$content = trim( $content );
+
+			return apply_filters( 'cp_podcast_content', $content );
+		}
+
+		/**
 		 * Abstract an obnoxiously common WP_Post sanity check
 		 *
 		 * @param WP_Post $post
@@ -448,10 +470,10 @@ if ( ! class_exists( 'ChurchPlugins\Helpers' ) ) :
 		public static function relative_time( $timestamp, $format = '' ) {
 			return apply_filters( 'cp_relative_time', self::calculate_relative_time( $timestamp, $format ), $timestamp, $format );
 		}
-		
+
 		/**
 		 * Convert timestamp to relative time
-		 * 
+		 *
 		 * @param $timestamp
 		 * @param $format
 		 *
@@ -524,8 +546,8 @@ if ( ! class_exists( 'ChurchPlugins\Helpers' ) ) :
 
 				return date( $format, $timestamp );
 			}
-		}		
-		
+		}
+
 		/**
 		 * @param $icon
 		 *

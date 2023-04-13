@@ -1,6 +1,6 @@
 <?php
 
-if ( ! class_exists( 'ChurchPlugins_107', false ) ) {
+if ( ! class_exists( 'ChurchPlugins_108', false ) ) {
 
 	/**
 	 * Handles checking for and loading the newest version of ChurchPlugins
@@ -11,7 +11,7 @@ if ( ! class_exists( 'ChurchPlugins_107', false ) ) {
 	 * @package   ChurchPlugins
 	 * @license   GPL-2.0+
 	 */
-	class ChurchPlugins_107 {
+	class ChurchPlugins_108 {
 
 		/**
 		 * Current version number
@@ -19,7 +19,7 @@ if ( ! class_exists( 'ChurchPlugins_107', false ) ) {
 		 * @var   string
 		 * @since 1.0.0
 		 */
-		const VERSION = '1.0.7';
+		const VERSION = '1.0.8';
 
 		/**
 		 * Current version hook priority.
@@ -28,12 +28,12 @@ if ( ! class_exists( 'ChurchPlugins_107', false ) ) {
 		 * @var   int
 		 * @since 1.0.0
 		 */
-		const PRIORITY = 9994;
+		const PRIORITY = 9992;
 
 		/**
 		 * Single instance of the ChurchPlugins object
 		 *
-		 * @var ChurchPlugins_107
+		 * @var ChurchPlugins_108
 		 */
 		public static $single_instance = null;
 
@@ -51,7 +51,7 @@ if ( ! class_exists( 'ChurchPlugins_107', false ) ) {
 		 * Creates/returns the single instance ChurchPlugins object
 		 *
 		 * @since  1.0.0
-		 * @return ChurchPlugins_107 Single instance object
+		 * @return ChurchPlugins_108 Single instance object
 		 */
 		public static function initiate() {
 			if ( null === self::$single_instance ) {
@@ -64,11 +64,6 @@ if ( ! class_exists( 'ChurchPlugins_107', false ) ) {
 		 * @since 1.0.0
 		 */
 		private function __construct() {
-
-			if ( ! defined( 'CHURCHPLUGINS_LOADED' ) ) {
-				define( 'CHURCHPLUGINS_LOADED', self::PRIORITY );
-			}
-
 			if ( ! function_exists( 'add_action' ) ) {
 				// We are running outside of the context of WordPress.
 				return;
@@ -91,6 +86,10 @@ if ( ! class_exists( 'ChurchPlugins_107', false ) ) {
 
 			define( 'CHURCHPLUGINS_VERSION', self::VERSION );
 
+			if ( ! defined( 'CHURCHPLUGINS_LOADED' ) ) {
+				define( 'CHURCHPLUGINS_LOADED', self::PRIORITY );
+			}
+
 			if ( ! defined( 'CHURCHPLUGINS_DIR' ) ) {
 				define( 'CHURCHPLUGINS_DIR', trailingslashit( dirname( __FILE__ ) ) );
 			}
@@ -100,6 +99,7 @@ if ( ! class_exists( 'ChurchPlugins_107', false ) ) {
 			require_once( CHURCHPLUGINS_DIR . 'CMB2/init.php' );
 			require_once( CHURCHPLUGINS_DIR . 'CMB2/includes/CMB2_Utils.php' );
 			require_once( CHURCHPLUGINS_DIR . 'Helpers.php' );
+			require_once( CHURCHPLUGINS_DIR . 'functions.php' );
 
 			if ( ! defined( 'CHURCHPLUGINS_URL' ) ) {
 				define( 'CHURCHPLUGINS_URL', trailingslashit( CMB2_Utils::get_url_from_dir( CHURCHPLUGINS_DIR ) ) );
@@ -142,11 +142,6 @@ if ( ! class_exists( 'ChurchPlugins_107', false ) ) {
 
 	}
 
-	function churchplugins() {
-		// Make it so...
-		return ChurchPlugins_107::initiate();
-	}
-
-	churchplugins();
+	return ChurchPlugins_108::initiate();
 
 }// End if().

@@ -272,6 +272,8 @@ abstract class PostType {
 			return false;
 		}
 
+		do_action( "cp_save_{$this->post_type}", $post_id );
+
 		return $model;
 	}
 
