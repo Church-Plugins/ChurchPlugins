@@ -115,6 +115,17 @@ final class _Init {
 			return;
 		}
 
+		require_once( 'Controls/_Control.php' );
+		require_once( 'Controls/Heading.php' );
+		require_once( 'Controls/Number.php' );
+		require_once( 'Controls/Radio.php' );
+		require_once( 'Controls/RangeSlider.php' );
+		require_once( 'Controls/Separator.php' );
+		require_once( 'Controls/Toggle.php' );
+
+		require_once( 'Sections/_Section.php' );
+		require_once( 'Sections/GlobalElements.php' );
+
 		/**
 		 * Filters the Panel ID, which is also the `wp_option` name for the Customizer settings
 		 *
@@ -156,6 +167,7 @@ final class _Init {
 	}
 
 	public function load_sections() {
+
 		// load sections
 		$sections = [ Sections\GlobalElements::class ];
 
@@ -265,12 +277,14 @@ final class _Init {
 	 * @return boolean
 	 */
 	public function is_active() {
+		$active = class_exists( 'WP_Customize_Manager' );
+
 		/**
 		 * Allows Developers to completely deactivate Church Plugins Customizer
 		 *
 		 * @param boolean $is_active
 		 */
-		return apply_filters( 'cp_customizer_is_active', true );
+		return apply_filters( 'cp_customizer_is_active', $active );
 	}
 
 	/**

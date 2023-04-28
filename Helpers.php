@@ -584,6 +584,15 @@ if ( ! class_exists( 'ChurchPlugins\Helpers' ) ) :
 				case 'copy' :
 					$markup = '<span class="material-icons-outlined">content_copy</span>';
 					break;
+				case 'report' :
+					$markup = '<span class="material-icons-outlined">report</span>';
+					break;
+				case 'child' :
+					$markup = '<span class="material-icons-outlined">escalator_warning</span>';
+					break;
+				case 'accessible' :
+					$markup = '<span class="material-icons-outlined">accessible</span>';
+					break;
 			}
 
 			return apply_filters( 'cp_get_icon', $markup, $icon );

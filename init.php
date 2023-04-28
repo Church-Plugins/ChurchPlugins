@@ -1,6 +1,6 @@
 <?php
 
-if ( ! class_exists( 'ChurchPlugins_108', false ) ) {
+if ( ! class_exists( 'ChurchPlugins_109', false ) ) {
 
 	/**
 	 * Handles checking for and loading the newest version of ChurchPlugins
@@ -11,7 +11,7 @@ if ( ! class_exists( 'ChurchPlugins_108', false ) ) {
 	 * @package   ChurchPlugins
 	 * @license   GPL-2.0+
 	 */
-	class ChurchPlugins_108 {
+	class ChurchPlugins_109 {
 
 		/**
 		 * Current version number
@@ -19,7 +19,7 @@ if ( ! class_exists( 'ChurchPlugins_108', false ) ) {
 		 * @var   string
 		 * @since 1.0.0
 		 */
-		const VERSION = '1.0.8';
+		const VERSION = '1.0.9';
 
 		/**
 		 * Current version hook priority.
@@ -28,12 +28,12 @@ if ( ! class_exists( 'ChurchPlugins_108', false ) ) {
 		 * @var   int
 		 * @since 1.0.0
 		 */
-		const PRIORITY = 9992;
+		const PRIORITY = 9991;
 
 		/**
 		 * Single instance of the ChurchPlugins object
 		 *
-		 * @var ChurchPlugins_108
+		 * @var ChurchPlugins_109
 		 */
 		public static $single_instance = null;
 
@@ -51,7 +51,7 @@ if ( ! class_exists( 'ChurchPlugins_108', false ) ) {
 		 * Creates/returns the single instance ChurchPlugins object
 		 *
 		 * @since  1.0.0
-		 * @return ChurchPlugins_108 Single instance object
+		 * @return ChurchPlugins_109 Single instance object
 		 */
 		public static function initiate() {
 			if ( null === self::$single_instance ) {
@@ -98,8 +98,18 @@ if ( ! class_exists( 'ChurchPlugins_108', false ) ) {
 			require_once( CHURCHPLUGINS_DIR . 'Admin/_Init.php' );
 			require_once( CHURCHPLUGINS_DIR . 'CMB2/init.php' );
 			require_once( CHURCHPLUGINS_DIR . 'CMB2/includes/CMB2_Utils.php' );
+			require_once( CHURCHPLUGINS_DIR . 'Integrations/CMB2/Init.php' );
 			require_once( CHURCHPLUGINS_DIR . 'Helpers.php' );
 			require_once( CHURCHPLUGINS_DIR . 'functions.php' );
+
+			require_once( CHURCHPLUGINS_DIR . 'Models/Table.php' );
+			require_once( CHURCHPLUGINS_DIR . 'Models/Log.php' );
+			require_once( CHURCHPLUGINS_DIR . 'Models/Source.php' );
+			require_once( CHURCHPLUGINS_DIR . 'Models/SourceType.php' );
+
+			require_once( CHURCHPLUGINS_DIR . 'Controllers/Controller.php' );
+
+			require_once( CHURCHPLUGINS_DIR . 'RequestAPI/Base.php' );
 
 			if ( ! defined( 'CHURCHPLUGINS_URL' ) ) {
 				define( 'CHURCHPLUGINS_URL', trailingslashit( CMB2_Utils::get_url_from_dir( CHURCHPLUGINS_DIR ) ) );
@@ -142,6 +152,6 @@ if ( ! class_exists( 'ChurchPlugins_108', false ) ) {
 
 	}
 
-	return ChurchPlugins_108::initiate();
+	return ChurchPlugins_109::initiate();
 
 }// End if().
