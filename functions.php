@@ -6,9 +6,9 @@
  * @since  1.0.8
  *
  *
- * @return ChurchPlugins_109
+ * @return ChurchPlugins_1010
  * @author Tanner Moushey, 4/13/23
  */
 function churchplugins() {
-	return ChurchPlugins_109::initiate();
+	return ChurchPlugins_1010::initiate();
 }

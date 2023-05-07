@@ -156,8 +156,9 @@ abstract class PostType {
 			'has_archive'  => $slug,
 			'hierarchical' => false,
 			'label'        => $single,
-			'rewrite'      => [
-				'slug' => $slug
+			'rewrite' => [
+				'slug'       => $slug,
+				'with_front' => false,
 			],
 			'supports'     => [ 'title', 'editor', 'thumbnail' ],
 			'labels'       => [

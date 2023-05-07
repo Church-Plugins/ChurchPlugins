@@ -1,6 +1,6 @@
 <?php
 
-if ( ! class_exists( 'ChurchPlugins_109', false ) ) {
+if ( ! class_exists( 'ChurchPlugins_1010', false ) ) {
 
 	/**
 	 * Handles checking for and loading the newest version of ChurchPlugins
@@ -11,7 +11,7 @@ if ( ! class_exists( 'ChurchPlugins_109', false ) ) {
 	 * @package   ChurchPlugins
 	 * @license   GPL-2.0+
 	 */
-	class ChurchPlugins_109 {
+	class ChurchPlugins_1010 {
 
 		/**
 		 * Current version number
@@ -19,7 +19,7 @@ if ( ! class_exists( 'ChurchPlugins_109', false ) ) {
 		 * @var   string
 		 * @since 1.0.0
 		 */
-		const VERSION = '1.0.9';
+		const VERSION = '1.0.10';
 
 		/**
 		 * Current version hook priority.
@@ -28,12 +28,12 @@ if ( ! class_exists( 'ChurchPlugins_109', false ) ) {
 		 * @var   int
 		 * @since 1.0.0
 		 */
-		const PRIORITY = 9991;
+		const PRIORITY = 9990;
 
 		/**
 		 * Single instance of the ChurchPlugins object
 		 *
-		 * @var ChurchPlugins_109
+		 * @var ChurchPlugins_1010
 		 */
 		public static $single_instance = null;
 
@@ -51,7 +51,7 @@ if ( ! class_exists( 'ChurchPlugins_109', false ) ) {
 		 * Creates/returns the single instance ChurchPlugins object
 		 *
 		 * @since  1.0.0
-		 * @return ChurchPlugins_109 Single instance object
+		 * @return ChurchPlugins_1010 Single instance object
 		 */
 		public static function initiate() {
 			if ( null === self::$single_instance ) {
@@ -94,6 +94,7 @@ if ( ! class_exists( 'ChurchPlugins_109', false ) ) {
 				define( 'CHURCHPLUGINS_DIR', trailingslashit( dirname( __FILE__ ) ) );
 			}
 
+			require_once( CHURCHPLUGINS_DIR . 'Exception.php' );
 			require_once( CHURCHPLUGINS_DIR . 'Setup/Init.php' );
 			require_once( CHURCHPLUGINS_DIR . 'Admin/_Init.php' );
 			require_once( CHURCHPLUGINS_DIR . 'CMB2/init.php' );
@@ -152,6 +153,6 @@ if ( ! class_exists( 'ChurchPlugins_109', false ) ) {
 
 	}
 
-	return ChurchPlugins_109::initiate();
+	return ChurchPlugins_1010::initiate();
 
 }// End if().
