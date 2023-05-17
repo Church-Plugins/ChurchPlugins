@@ -197,37 +197,12 @@ abstract class PostType {
 		add_filter( 'cmb2_override_meta_save', [ $this, 'meta_save_override' ], 10, 4 );
 		add_filter( 'cmb2_override_meta_remove', [ $this, 'meta_save_override' ], 10, 4 );
 
-		if ( empty( $_GET['cpl-recovery'] ) ) {
+		if ( empty( $_GET['cp-recovery'] ) ) {
 			add_filter( 'cmb2_override_meta_value', [ $this, 'meta_get_override' ], 10, 4 );
 		}
 
 		add_action( "deleted_post", [ $this, 'delete_post' ] );
 		add_action( 'cp_register_post_types', [ $this, 'register_post_type' ] );
-
-		// legacy from CP Library
-		add_filter( 'cpl_app_vars', [ $this, 'app_vars' ] );
-	}
-
-	/**
-	 * Add vars for app localization
-	 *
-	 * @param $vars
-	 *
-	 * @return mixed
-	 * @since  1.0.0
-	 *
-	 * @author Tanner Moushey
-	 */
-	public function app_vars( $vars ) {
-		$type = get_post_type_object( $this->post_type );
-		$key  = str_replace( CP_LIBRARY_UPREFIX . '_', '', $this->post_type );
-		$vars[ $key ] = [
-			'labelSingular' => $type->labels->singular_name,
-			'labelPlural'   => $type->labels->name,
-			'slug'          => isset( $type->rewrite['slug'] ) ? $type->rewrite['slug'] : $type->rewrite,
-		];
-
-		return $vars;
 	}
 
 	/**

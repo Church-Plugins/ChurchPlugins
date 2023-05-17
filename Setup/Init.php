@@ -142,7 +142,7 @@ class Init {
 			}
 
 			if ( $installed ) {
-				do_action( 'cpl_after_table_created' );
+				do_action( 'cp_resources_after_table_created' );
 			}
 
 			update_option( 'cp_table_check', CHURCHPLUGINS_VERSION );

@@ -32,8 +32,8 @@ abstract class Taxonomy {
 
 	/**
 	 * The type of field to use for the admin
-	 * 
-	 * @var string 
+	 *
+	 * @var string
 	 */
 	public $field_type = 'pw_multiselect';
 
@@ -88,7 +88,7 @@ abstract class Taxonomy {
 			throw new Exception( "No configuration present for this Taxonomy" );
 			return;
 		}
-		
+
 		if ( empty( $this->get_object_types() ) ) {
 			return;
 		}
@@ -113,12 +113,12 @@ abstract class Taxonomy {
 
 			foreach( $set_terms as $name ) {
 				$index = array_search( $name, $terms );
-				
+
 				// if we didn't find the item as a value, check it as a key
 				if ( false === $index && array_key_exists( $name, $terms ) ) {
 					$index = $name;
 				}
-				
+
 				$terms = array_merge( [ $index => $name ], $terms );
 			}
 		}
@@ -135,12 +135,12 @@ abstract class Taxonomy {
 	 * @author costmo
 	 */
 	public function register_metaboxes() {
-		
+
 		// only register if we have object types
 		if ( empty( $this->get_object_types() ) ) {
 			return;
 		}
-		
+
 		$terms = $this->get_terms_for_metabox();
 
 		$args = apply_filters( "{$this->taxonomy}_metabox_args", [
@@ -156,7 +156,7 @@ abstract class Taxonomy {
 		$cmb = new_cmb2_box( $args );
 
 		$cmb->add_field( apply_filters( "{$this->taxonomy}_metabox_field_args", [
-			'name'              => sprintf( __( 'Assign %s', 'cp-library' ), $this->plural_label ),
+			'name'              => sprintf( __( 'Assign %s', 'cp-resources' ), $this->plural_label ),
 			'id'                => $this->taxonomy,
 			'type'              => $this->field_type,
 			'select_all_button' => false,
@@ -207,17 +207,17 @@ abstract class Taxonomy {
 		$labels = array(
 			'name'                       => $this->plural_label,
 			'singular_name'              => $this->single_label,
-			'search_items'               => sprintf( __( 'Search %s', 'cp-library' ), $this->plural_label ),
-			'popular_items'              => sprintf( __( 'Popular %s', 'cp-library' ), $this->plural_label ),
-			'all_items'                  => sprintf( __( 'All %s', 'cp-library' ), $this->plural_label ),
-			'edit_item'                  => sprintf( __( 'Edit %s', 'cp-library' ), $this->single_label ),
-			'update_item'                => sprintf( __( 'Update %s', 'cp-library' ), $this->single_label ),
-			'add_new_item'               => sprintf( __( 'Add New %s', 'cp-library' ), $this->single_label ),
-			'new_item_name'              => sprintf( __( 'New %s Name', 'cp-library' ), $this->single_label ),
-			'separate_items_with_commas' => sprintf( __( 'Separate %s with commas', 'cp-library' ), strtolower( $this->plural_label ) ),
-			'add_or_remove_items'        => sprintf( __( 'Add or remove %s', 'cp-library' ), strtolower( $this->plural_label ) ),
-			'choose_from_most_used'      => sprintf( __( 'Choose from the most used %s', 'cp-library' ), strtolower( $this->plural_label ) ),
-			'not_found'                  => sprintf( __( 'No %s found.', 'cp-library' ), strtolower( $this->plural_label ) ),
+			'search_items'               => sprintf( __( 'Search %s', 'cp-resources' ), $this->plural_label ),
+			'popular_items'              => sprintf( __( 'Popular %s', 'cp-resources' ), $this->plural_label ),
+			'all_items'                  => sprintf( __( 'All %s', 'cp-resources' ), $this->plural_label ),
+			'edit_item'                  => sprintf( __( 'Edit %s', 'cp-resources' ), $this->single_label ),
+			'update_item'                => sprintf( __( 'Update %s', 'cp-resources' ), $this->single_label ),
+			'add_new_item'               => sprintf( __( 'Add New %s', 'cp-resources' ), $this->single_label ),
+			'new_item_name'              => sprintf( __( 'New %s Name', 'cp-resources' ), $this->single_label ),
+			'separate_items_with_commas' => sprintf( __( 'Separate %s with commas', 'cp-resources' ), strtolower( $this->plural_label ) ),
+			'add_or_remove_items'        => sprintf( __( 'Add or remove %s', 'cp-resources' ), strtolower( $this->plural_label ) ),
+			'choose_from_most_used'      => sprintf( __( 'Choose from the most used %s', 'cp-resources' ), strtolower( $this->plural_label ) ),
+			'not_found'                  => sprintf( __( 'No %s found.', 'cp-resources' ), strtolower( $this->plural_label ) ),
 			'menu_name'                  => $this->plural_label,
 		);
 
@@ -246,32 +246,7 @@ abstract class Taxonomy {
 		add_filter( 'cmb2_override_meta_value', [ $this, 'meta_get_override' ], 10, 4 );
 
 		add_action( 'cp_register_taxonomies', [ $this, 'register_taxonomy' ] );
-		add_filter( 'cp_app_vars', [ $this, 'app_vars' ] );
 	}
-
-	/**
-	 * Add vars for app localization
-	 *
-	 * @param $vars
-	 *
-	 * @return mixed
-	 * @since  1.0.0
-	 *
-	 * @author Tanner Moushey
-	 */
-	public function app_vars( $vars ) {
-		$type = get_taxonomy( $this->taxonomy );
-		$key  = str_replace( CP_LIBRARY_UPREFIX . '_', '', $this->taxonomy );
-
-		$vars[ $key ] = [
-			'labelSingular' => $type->labels->singular_name,
-			'labelPlural'   => $type->labels->name,
-			'slug'          => $type->rewrite['slug'],
-		];
-
-		return $vars;
-	}
-
 
 	/**
 	 * Hijack the meta save filter to save to our tables
