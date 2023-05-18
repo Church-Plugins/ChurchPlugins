@@ -175,7 +175,11 @@ class _Init {
 
 		$import->map_fields( $map['cp-import-field'] );
 
-		$ret = $import->process_step( $step );
+    $options = array(
+      'sideload_audio' => $map['sideload-audio-urls'] == 'on',
+    );
+
+		$ret = $import->process_step( $step, $options );
 
 		$percentage = $import->get_percentage_complete();
 

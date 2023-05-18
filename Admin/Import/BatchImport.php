@@ -504,8 +504,8 @@ class BatchImport {
 	 * @param $post_id
 	 * @param $media_url
 	 *
-	 * @return bool|int
-	 * @since  1.0.6
+	 * @return string
+	 * @since  1.0.10
 	 *
 	 * @author Jonathan Roley
 	 */
@@ -521,7 +521,7 @@ class BatchImport {
 
 		} elseif ( $is_url ) {
 
-			if ( ! function_exists( 'wp_handle_sideload' ) ) {
+			if ( ! function_exists( 'media_handle_sideload' ) ) {
 
 				require_once( ABSPATH . 'wp-admin/includes/file.php' );
 
