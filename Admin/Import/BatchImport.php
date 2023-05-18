@@ -498,6 +498,67 @@ class BatchImport {
 
 	}
 
+  /**
+	 * Downloads and adds file to media library from url
+	 *
+	 * @param $post_id
+	 * @param $media_url
+	 *
+	 * @return bool|int
+	 * @since  1.0.6
+	 *
+	 * @author Jonathan Roley
+	 */
+	public function sideload_media_and_get_url( $post_id = 0, $media_url = '' ) {
+
+    $is_url   = false !== filter_var( $media_url, FILTER_VALIDATE_URL );
+		$is_local = $is_url && false !== strpos( site_url(), $media_url );
+
+		if ( $is_url && $is_local ) {
+
+			// Image given by URL, see if we have an attachment already
+			$attachment_id = attachment_url_to_postid( $media_url );
+
+		} elseif ( $is_url ) {
+
+			if ( ! function_exists( 'wp_handle_sideload' ) ) {
+
+				require_once( ABSPATH . 'wp-admin/includes/file.php' );
+
+			}
+
+      $tmp = download_url( $media_url );
+
+      $file_array = array(
+        'name' => basename( $media_url ),
+        'tmp_name' => $tmp
+      );
+
+      if( is_wp_error( $tmp ) ) {
+        @unlink( $file_array['tmp_name' ]);
+        return $media_url;
+      }
+
+      $media_id = media_handle_sideload( $file_array, $post_id );
+
+      if ( is_wp_error( $media_id ) ) {
+        @unlink( $file_array['tmp_name'] );
+        return $media_url;
+      }
+
+      $attachment_id = $media_id;
+
+		}
+
+		if ( ! empty( $attachment_id ) ) {
+      $attachment_url = wp_get_attachment_url( $attachment_id );
+
+			return $attachment_url;
+		}
+
+		return $media_url;
+	}
+
 	/**
 	 * Get File Extension
 	 *
