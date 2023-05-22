@@ -54,6 +54,14 @@ abstract class Taxonomy {
 	public $taxonomy = null;
 
 	/**
+	 * The priority of the metabox
+	 *
+	 * @since 1.0.12
+	 * @var int
+	 */
+	protected $metabox_priority = 10;
+
+	/**
 	 * Only make one instance of Taxonomy
 	 *
 	 * @return self
@@ -239,7 +247,7 @@ abstract class Taxonomy {
 	 * @author costmo
 	 */
 	public function add_actions() {
-		add_action( 'cmb2_admin_init', [ $this, 'register_metaboxes' ] );
+		add_action( 'cmb2_admin_init', [ $this, 'register_metaboxes' ], $this->metabox_priority );
 
 		add_filter( 'cmb2_override_meta_save', [ $this, 'meta_save_override' ], 10, 4 );
 		add_filter( 'cmb2_override_meta_remove', [ $this, 'meta_save_override' ], 10, 4 );

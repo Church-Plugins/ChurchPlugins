@@ -46,7 +46,7 @@ class Init {
 	 */
 	protected function __construct() {
 		add_filter( 'cmb2_render_license', array( $this, 'render_license' ), 10, 5 );
-		
+
 		add_filter( 'cmb2_render_pw_select', array( $this, 'render_pw_select' ), 10, 5 );
 		add_filter( 'cmb2_render_pw_multiselect', array( $this, 'render_pw_multiselect' ), 10, 5 );
 		add_filter( 'cmb2_sanitize_pw_multiselect', array( $this, 'pw_multiselect_sanitize' ), 10, 4 );
@@ -57,7 +57,7 @@ class Init {
 	public function render_license( $field, $field_escaped_value, $field_object_id, $field_object_type, $field_type_object ) {
 		$desc = $field_type_object->field->args['description'];
 		$field_type_object->field->args['desc'] = $field_type_object->field->args['description'] = '';
-		
+
 		$args = [];
 		if ( $field->args['is_active'] ) {
 			$args['disabled'] = 'disabled';
@@ -65,10 +65,10 @@ class Init {
 
 		$render_class = $field_type_object->get_new_render_type( 'text', 'CMB2_Type_Text' );
 		echo $render_class->render( $args );
-		
+
 		if ( $field->args['nonce'] ) {
 			echo $field->args['nonce'];
-			
+
 			if ( $field->args['is_active'] ) {
 				echo '<span style="margin: .25rem .5rem;color: #00a32a;" class="dashicons dashicons-yes"></span>';
 			} else {
@@ -80,7 +80,7 @@ class Init {
 		$field_type_object->field->args['desc'] = $field_type_object->field->args['description'] = $desc;
 		echo $render_class->_desc( true );
 	}
-	
+
 	/**
 	 * Render select box field
 	 */
@@ -117,7 +117,7 @@ class Init {
 			'id'               => $field_type_object->_id(),
 			'desc'             => $field_type_object->_desc( true ),
 			'options'          => $this->get_pw_multiselect_options( $field_escaped_value, $field_type_object ),
-			'data-placeholder' => $field->args( 'attributes', 'placeholder' ) ? $field->args( 'attributes', 'placeholder' ) : $field->args( 'description' ),
+			'data-placeholder' => $field->args( 'attributes', 'placeholder' ) ? $field->args( 'attributes', 'placeholder' ) : '',
 		) );
 
 		$attrs = $field_type_object->concat_attrs( $a, array( 'desc', 'options' ) );
