@@ -538,17 +538,15 @@ class BatchImport {
 			}
 
 			$tmp = download_url( $media_url );
+			
+			if ( is_wp_error( $tmp ) ) {
+				return $media_url;
+			}
 
 			$file_array = array(
 				'name'     => basename( $media_url ),
 				'tmp_name' => $tmp
 			);
-
-			if ( is_wp_error( $tmp ) ) {
-				@unlink( $file_array['tmp_name'] );
-
-				return $media_url;
-			}
 
 			$media_id = media_handle_sideload( $file_array, $post_id );
 
