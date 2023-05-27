@@ -402,10 +402,12 @@ class BatchImport {
 	 * @author Tanner Moushey
 	 */
 	public function set_image( $post_id = 0, $image = '', $post_author = 0 ) {
+		$upload_dir = wp_upload_dir();
 
-		$is_url   = false !== filter_var( $image, FILTER_VALIDATE_URL );
-		$is_local = $is_url && false !== strpos( site_url(), $image );
+		$image    = $this->maybe_find_local_file( $image );
 		$ext      = $this->get_file_extension( $image );
+		$is_url   = false !== filter_var( $image, FILTER_VALIDATE_URL );
+		$is_local = $is_url && false !== strpos( $image, site_url() );
 
 		if ( $is_url && $is_local ) {
 
@@ -422,91 +424,118 @@ class BatchImport {
 			$url = media_sideload_image( $image, $post_id, '', 'src' );
 
 			if ( ! is_wp_error( $url ) ) {
-
 				$attachment_id = attachment_url_to_postid( $url );
-
 			}
 
+		} elseif ( false === strpos( $image, '/' ) && $ext && $file = $this->get_media_by_filename( $image ) ) {
 
-		} elseif ( false === strpos( $image, '/' ) && $this->get_file_extension( $image ) ) {
+			// We found the file, let's see if it already exists in the media library
+			$guid          = str_replace( $upload_dir['basedir'], $upload_dir['baseurl'], $file );
+			$attachment_id = attachment_url_to_postid( $guid );
 
-			// Image given by name only
+			// generate the attachment record
+			if ( empty( $attachment_id ) ) {
 
-			$upload_dir = wp_upload_dir();
+				// Doesn't exist in the media library, let's add it
 
-			if ( file_exists( trailingslashit( $upload_dir['path'] ) . $image ) ) {
+				$filetype = wp_check_filetype( basename( $file ), null );
 
-				// Look in current upload directory first
-				$file = trailingslashit( $upload_dir['path'] ) . $image;
+				// Prepare an array of post data for the attachment.
+				$attachment = array(
+					'guid'           => $guid,
+					'post_mime_type' => $filetype['type'],
+					'post_title'     => preg_replace( '/\.[^.]+$/', '', $image ),
+					'post_content'   => '',
+					'post_status'    => 'inherit',
+					'post_author'    => $post_author
+				);
 
-			} else {
+				// Insert the attachment.
+				$attachment_id = wp_insert_attachment( $attachment, $file, $post_id );
 
-				// Now look through year/month sub folders of upload directory for files with our image's same extension
-				$files = glob( $upload_dir['basedir'] . '/*/*/*' . $ext );
-				foreach ( $files as $file ) {
+				// Make sure that this file is included, as wp_generate_attachment_metadata() depends on it.
+				require_once( ABSPATH . 'wp-admin/includes/image.php' );
 
-					if ( basename( $file ) == $image ) {
-
-						// Found our file
-						break;
-
-					}
-
-					// Make sure $file is unset so our empty check below does not return a false positive
-					unset( $file );
-
-				}
-
-			}
-
-			if ( ! empty( $file ) ) {
-
-				// We found the file, let's see if it already exists in the media library
-
-				$guid          = str_replace( $upload_dir['basedir'], $upload_dir['baseurl'], $file );
-				$attachment_id = attachment_url_to_postid( $guid );
-
-
-				if ( empty( $attachment_id ) ) {
-
-					// Doesn't exist in the media library, let's add it
-
-					$filetype = wp_check_filetype( basename( $file ), null );
-
-					// Prepare an array of post data for the attachment.
-					$attachment = array(
-						'guid'           => $guid,
-						'post_mime_type' => $filetype['type'],
-						'post_title'     => preg_replace( '/\.[^.]+$/', '', $image ),
-						'post_content'   => '',
-						'post_status'    => 'inherit',
-						'post_author'    => $post_author
-					);
-
-					// Insert the attachment.
-					$attachment_id = wp_insert_attachment( $attachment, $file, $post_id );
-
-					// Make sure that this file is included, as wp_generate_attachment_metadata() depends on it.
-					require_once( ABSPATH . 'wp-admin/includes/image.php' );
-
-					// Generate the metadata for the attachment, and update the database record.
-					$attach_data = wp_generate_attachment_metadata( $attachment_id, $file );
-					wp_update_attachment_metadata( $attachment_id, $attach_data );
-
-				}
+				// Generate the metadata for the attachment, and update the database record.
+				$attach_data = wp_generate_attachment_metadata( $attachment_id, $file );
+				wp_update_attachment_metadata( $attachment_id, $attach_data );
 
 			}
-
 		}
 
 		if ( ! empty( $attachment_id ) ) {
-
 			return set_post_thumbnail( $post_id, $attachment_id );
-
 		}
 
 		return false;
 
+	}
+
+	/**
+	 * Look for the provided file in the uploads directory
+	 *
+	 * @since  1.0.13
+	 *
+	 * @param $filename
+	 *
+	 * @return false|mixed|string
+	 * @author Tanner Moushey, 5/26/23
+	 */
+	public function get_media_by_filename( $filename ) {
+		$ext        = $this->get_file_extension( $filename );
+		$upload_dir = wp_upload_dir();
+
+		if ( file_exists( trailingslashit( $upload_dir['path'] ) . $filename ) ) {
+
+			// Look in current upload directory first
+			return trailingslashit( $upload_dir['path'] ) . $filename;
+
+		} else {
+
+			// Now look through year/month sub folders of upload directory for files with our image's same extension
+			$files = glob( $upload_dir['basedir'] . '/*/*/*' . $ext );
+			foreach ( $files as $file ) {
+				// Found our file
+				if ( basename( $file ) == $filename ) {
+					return $file;
+				}
+			}
+
+		}
+
+		return false;
+	}
+
+	/**
+	 * Check to see if the provided file exists locally. Return the local file if found, or the original file if not.
+	 *
+	 * @since  1.0.13
+	 *
+	 * @param $file
+	 *
+	 * @return array|mixed|string|string[]
+	 * @author Tanner Moushey, 5/26/23
+	 */
+	public function maybe_find_local_file( $file ) {
+		$upload_dir = wp_upload_dir();
+
+		if ( ! $this->get_file_extension( $file ) ) {
+			return $file;
+		}
+
+		$filename = array_pop( explode( '/', $file ) );
+
+		if ( $found_file = $this->get_media_by_filename( $filename ) ) {
+			$found_file = str_replace( $upload_dir['basedir'], $upload_dir['baseurl'], $found_file );
+
+			if ( false !== strpos( site_url(), 'https' ) ) {
+				$file = str_replace( 'http://', 'https://', $found_file );
+			} else {
+				$file = str_replace( 'https://', 'http://', $found_file );
+			}
+		}
+
+		return $file;
 	}
 
 	/**
@@ -523,8 +552,9 @@ class BatchImport {
 	 */
 	public function sideload_media_and_get_url( $post_id = 0, $media_url = '' ) {
 
-		$is_url   = false !== filter_var( $media_url, FILTER_VALIDATE_URL );
-		$is_local = $is_url && false !== strpos( site_url(), $media_url );
+		$media_url = $this->maybe_find_local_file( $media_url );
+		$is_url    = false !== filter_var( $media_url, FILTER_VALIDATE_URL );
+		$is_local  = $is_url && false !== strpos( site_url(), $media_url );
 
 		if ( $is_url && $is_local ) {
 
