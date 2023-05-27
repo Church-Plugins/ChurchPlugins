@@ -175,9 +175,12 @@ class _Init {
 
 		$import->map_fields( $map['cp-import-field'] );
 
-    $options = array(
-      'sideload_audio' => $map['sideload-audio-urls'] == 'on',
-    );
+		$options = array(
+			'sideload_audio'    => $map['sideload-audio-urls'] == 'on',
+			'stop_on_error'     => $map['stop-on-error'] == 'on',
+		);
+
+		$options = apply_filters( 'cp_do_ajax_import_options', $options, $map, $step, $class );
 
 		$ret = $import->process_step( $step, $options );
 

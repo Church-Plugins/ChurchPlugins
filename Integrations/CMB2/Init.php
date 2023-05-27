@@ -52,6 +52,13 @@ class Init {
 		add_filter( 'cmb2_sanitize_pw_multiselect', array( $this, 'pw_multiselect_sanitize' ), 10, 4 );
 		add_filter( 'cmb2_types_esc_pw_multiselect', array( $this, 'pw_multiselect_escaped_value' ), 10, 3 );
 		add_filter( 'cmb2_repeat_table_row_types', array( $this, 'pw_multiselect_table_row_class' ), 10, 1 );
+
+		add_action( 'admin_enqueue_scripts', [ $this, 'admin_scripts' ] );
+	}
+
+	public function admin_scripts() {
+		$asset_path = CHURCHPLUGINS_URL . 'Integrations/CMB2';
+		wp_enqueue_script( 'cmb2-conditional-logic', $asset_path . '/js/cmb2-conditional-logic.js', array( 'jquery' ), self::VERSION );
 	}
 
 	public function render_license( $field, $field_escaped_value, $field_object_id, $field_object_type, $field_type_object ) {

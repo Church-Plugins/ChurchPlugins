@@ -6,6 +6,11 @@ Common utility and helper functions.
 **License:**           GPLv2 or later
 **License URI:**       [http://www.gnu.org/licenses/gpl-2.0.html](http://www.gnu.org/licenses/gpl-2.0.html)
 
+### 1.0.13 - 5/23/2023
+* Add import method to break on error
+* Always unlink the temp file after processing on import
+* Add conditional logic script to CMB2
+
 ### 1.0.12 - 5/22/2023
 * Fix metabox issues
 * Add sideload functionality to importer

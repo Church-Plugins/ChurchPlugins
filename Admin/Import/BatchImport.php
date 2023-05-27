@@ -538,7 +538,7 @@ class BatchImport {
 			}
 
 			$tmp = download_url( $media_url );
-			
+
 			if ( is_wp_error( $tmp ) ) {
 				return $media_url;
 			}
@@ -549,10 +549,9 @@ class BatchImport {
 			);
 
 			$media_id = media_handle_sideload( $file_array, $post_id );
+			@unlink( $file_array['tmp_name'] );
 
 			if ( is_wp_error( $media_id ) ) {
-				@unlink( $file_array['tmp_name'] );
-
 				return $media_url;
 			}
 
@@ -561,9 +560,7 @@ class BatchImport {
 		}
 
 		if ( ! empty( $attachment_id ) ) {
-			$attachment_url = wp_get_attachment_url( $attachment_id );
-
-			return $attachment_url;
+			return wp_get_attachment_url( $attachment_id );
 		}
 
 		return $media_url;
