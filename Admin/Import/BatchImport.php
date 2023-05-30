@@ -14,6 +14,8 @@ namespace ChurchPlugins\Admin\Import;
 // Exit if accessed directly
 defined( 'ABSPATH' ) || exit;
 
+use ChurchPlugins\Helpers;
+
 /**
  * BatchImport Class
  *
@@ -405,7 +407,7 @@ class BatchImport {
 		$upload_dir = wp_upload_dir();
 
 		$image    = $this->maybe_find_local_file( $image );
-		$ext      = $this->get_file_extension( $image );
+		$ext      = Helpers::get_file_extension( $image );
 		$is_url   = false !== filter_var( $image, FILTER_VALIDATE_URL );
 		$is_local = $is_url && false !== strpos( $image, site_url() );
 
@@ -482,7 +484,7 @@ class BatchImport {
 	 * @author Tanner Moushey, 5/26/23
 	 */
 	public function get_media_by_filename( $filename ) {
-		$ext        = $this->get_file_extension( $filename );
+		$ext        = Helpers::get_file_extension( $filename );
 		$upload_dir = wp_upload_dir();
 
 		if ( file_exists( trailingslashit( $upload_dir['path'] ) . $filename ) ) {
@@ -519,7 +521,7 @@ class BatchImport {
 	public function maybe_find_local_file( $file ) {
 		$upload_dir = wp_upload_dir();
 
-		if ( ! $this->get_file_extension( $file ) ) {
+		if ( ! Helpers::get_file_extension( $file ) ) {
 			return $file;
 		}
 
@@ -596,27 +598,4 @@ class BatchImport {
 		return $media_url;
 	}
 
-	/**
-	 * Get File Extension
-	 *
-	 * Returns the file extension of a filename.
-	 *
-	 * @since  1.0.6
-	 *
-	 * @param $str
-	 *
-	 *
-	 * @return false|mixed|string
-	 * @author Tanner Moushey
-	 */
-	public function get_file_extension( $str ) {
-		$parts          = explode( '.', $str );
-		$file_extension = end( $parts );
-
-		if ( false !== strpos( $file_extension, '?' ) ) {
-			$file_extension = substr( $file_extension, 0, strpos( $file_extension, '?' ) );
-		}
-
-		return $file_extension;
-	}
 }

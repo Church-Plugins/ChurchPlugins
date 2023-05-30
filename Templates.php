@@ -451,7 +451,7 @@ abstract class Templates {
 		extract( $args );
 
 		// append .php to file name
-		if ( substr( $template, - 4 ) != '.php' && false === strpos( $template, '.json' ) ) {
+		if ( substr( $template, - 4 ) != '.php' && false === strpos( $template, '.json' ) && false === strpos( $template, 'svg' ) ) {
 			$template .= '.php';
 		}
 
