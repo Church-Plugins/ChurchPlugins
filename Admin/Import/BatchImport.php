@@ -525,7 +525,8 @@ class BatchImport {
 			return $file;
 		}
 
-		$filename = array_pop( explode( '/', $file ) );
+		$filename = explode( '/', $file );
+		$filename = array_pop( $filename );
 
 		if ( $found_file = $this->get_media_by_filename( $filename ) ) {
 			$found_file = str_replace( $upload_dir['basedir'], $upload_dir['baseurl'], $found_file );
