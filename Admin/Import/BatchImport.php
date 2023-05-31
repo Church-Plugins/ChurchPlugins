@@ -557,7 +557,7 @@ class BatchImport {
 
 		$media_url = $this->maybe_find_local_file( $media_url );
 		$is_url    = false !== filter_var( $media_url, FILTER_VALIDATE_URL );
-		$is_local  = $is_url && false !== strpos( site_url(), $media_url );
+		$is_local  = $is_url && false !== strpos( $media_url, site_url() );
 
 		if ( $is_url && $is_local ) {
 
