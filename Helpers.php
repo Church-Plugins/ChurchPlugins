@@ -804,7 +804,7 @@ if ( ! class_exists( 'ChurchPlugins\Helpers' ) ) :
 		 * @author Tanner Moushey, 5/29/23
 		 */
 		public static function get_file_type( $filename ) {
-			$extension = self::get_file_extension( $filename );
+			$ext = $extension = self::get_file_extension( $filename );
 
 			// get the base extension
 			switch ( $extension ) {
