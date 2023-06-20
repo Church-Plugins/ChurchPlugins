@@ -4,7 +4,7 @@
  * @version   1.1.0
  * @license   under GPL v2.0 (https://github.com/awran5/CMB2-conditional-logic/blob/master/LICENSE)
  * @copyright © 2018 Awran5. All rights reserved.
- * 
+ *
  */
 
 
@@ -122,12 +122,13 @@ jQuery(function($) {
   }
 
   // Trigger the funtion
-  CMB2Conditional();
-
-  // Trigger again when new group added
-  $('.cmb2-wrap > .cmb2-metabox').on('cmb2_add_row', function () {
+  $(document).ready( function() {
+    $('<style>').text(".field_is_hidden {display: none !important;}").appendTo(document.head)
 
     CMB2Conditional();
-
-  });
+    // Trigger again when new group added
+    $('.cmb2-wrap > .cmb2-metabox').on('cmb2_add_row', function () {
+      CMB2Conditional();
+    });
+  })
 })
