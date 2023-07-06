@@ -72,6 +72,7 @@ class Init {
 		add_action( 'admin_init', [ $this, 'update_install' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'register_scripts'], 5 );
 		add_action( 'wp_enqueue_scripts', [ $this, 'register_frontend_scripts' ], 5 );
+		add_action( 'admin_enqueue_scripts', [ $this, 'register_frontend_scripts' ], 5 );
 	}
 
 	/**
