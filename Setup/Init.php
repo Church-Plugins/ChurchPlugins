@@ -71,8 +71,8 @@ class Init {
 	protected function actions() {
 		add_action( 'admin_init', [ $this, 'update_install' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'register_scripts'], 5 );
-		add_action( 'wp_enqueue_scripts', [ $this, 'register_frontend_scripts' ], 5 );
-		add_action( 'admin_enqueue_scripts', [ $this, 'register_frontend_scripts' ], 5 );
+		add_action( 'wp_enqueue_scripts', [ $this, 'register_material_icons' ], 5 );
+		add_action( 'admin_enqueue_scripts', [ $this, 'register_material_icons' ], 5 );
 	}
 
 	/**
@@ -93,7 +93,10 @@ class Init {
 		wp_register_script( 'cp-admin-tools-import', CHURCHPLUGINS_URL . 'assets/js/admin/tools/import.js', array( 'jquery', 'jquery-form', 'underscore' ), CHURCHPLUGINS_VERSION  );
 	}
 
-	public function register_frontend_scripts() {
+	/**
+         * Registers the material icons stylesheet
+	 */
+	public function register_material_icons() {
 		wp_register_style( 'material-icons', 'https://fonts.googleapis.com/css?family=Material+Icons|Material+Icons+Outlined' );
 	}
 
