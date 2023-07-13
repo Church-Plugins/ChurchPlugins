@@ -59,12 +59,11 @@ class Log extends Table  {
 
 		foreach( [ 'object_type', 'object_id', 'action', 'user_id' ] as $condition ) {
 			if ( isset( $args[ $condition ] ) ) {
-				$where .= sprintf( ' AND %s = "%s" ', $condition, $args[ $condition ] );
+				$where .= sprintf( " AND %s = '%s' ", $condition, $args[ $condition ] );
 			}
 		}
 
-		return $wpdb->get_results( $wpdb->prepare( "SELECT action, Count(*) as count FROM " . static::get_prop( 'table_name' ) . ' %s Group By action', $where ) );
-
+		return $wpdb->get_results( sprintf( "SELECT action, COUNT(*) as count FROM " . static::get_prop( 'table_name' ) .  " %s GROUP BY action", $where ) );
 	}
 
 	/**
