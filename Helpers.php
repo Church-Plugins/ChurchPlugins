@@ -765,6 +765,162 @@ if ( ! class_exists( 'ChurchPlugins\Helpers' ) ) :
 			}
 		}
 
+		/**
+		 * Get File Extension. Maybe use pathinfo in the future?
+		 *
+		 * Returns the file extension of a filename.
+		 *
+		 * @since  1.0.6
+		 *
+		 * @param $filename
+		 *
+		 *
+		 * @return false|mixed|string
+		 * @author Tanner Moushey
+		 */
+		public static function get_file_extension( $filename ) {
+			if ( false === strstr( $filename, '.' ) ) {
+				return false;
+			}
+
+			$parts          = explode( '.', $filename );
+			$file_extension = end( $parts );
+
+			if ( false !== strpos( $file_extension, '?' ) ) {
+				$file_extension = substr( $file_extension, 0, strpos( $file_extension, '?' ) );
+			}
+
+			return apply_filters( 'cp_get_file_extension', strtolower( $file_extension ) );
+		}
+
+		/**
+		 * Get the mime type for the provided file
+		 *
+		 * @since  1.0.13
+		 *
+		 * @param $filename
+		 *
+		 * @return mixed|void
+		 * @author Tanner Moushey, 5/29/23
+		 */
+		public static function get_file_type( $filename ) {
+			$ext = $extension = self::get_file_extension( $filename );
+
+			// get the base extension
+			switch ( $extension ) {
+				case 'doc':
+				case 'docx':
+				case 'dot':
+				case 'dotx':
+				case 'docm':
+				case 'dotm':
+					$ext = 'doc';
+					break;
+				case 'xls':
+				case 'xlsx':
+					$ext = 'xls';
+					break;
+				case 'ppt':
+				case 'pptx':
+					$ext = 'ppt';
+					break;
+				case 'jpg':
+				case 'jpeg':
+					$ext = 'jpg';
+					break;
+				case 'png':
+					$ext = 'png';
+					break;
+				case 'htm':
+				case 'html':
+					$ext = 'html';
+					break;
+				default:
+					if ( false !== strpos( $filename, 'http' ) ) {
+						$ext = 'link';
+					}
+
+					break;
+			}
+
+			// get the type for the extension
+			switch( $ext ) {
+				case 'doc':
+				case 'xls':
+				case 'ppt':
+				case 'pdf':
+				case 'zip':
+				case 'csv':
+					$type = 'application';
+					break;
+				case 'jpg':
+				case 'png':
+				case 'gif':
+				case 'svg':
+					$type = 'image';
+					break;
+				case 'mp3':
+				case 'aac':
+					$type = 'audio';
+					break;
+				case 'mp4':
+				case 'mov':
+					$type = 'video';
+					break;
+				case 'txt':
+				case 'html':
+				case 'link':
+				case 'css':
+					$type = 'text';
+					break;
+				default:
+					$type = 'unknown';
+					break;
+			}
+
+			return apply_filters( 'cp_get_file_type', "$type/$ext", $filename, $type, $ext );
+		}
+
+		/**
+		 * Determine if the provided types match the type of the file.
+		 *
+		 * Will return true if any if the types is a match to the file's mime type.
+		 *
+		 * @since  1.0.13
+		 *
+		 * @param $filename
+		 * @param $types
+		 *
+		 * @return false|mixed|void
+		 * @author Tanner Moushey, 5/29/23
+		 */
+		public static function is_file_type( $filename, $types ) {
+			$return = false;
+
+			if ( ! $filetype = self::get_file_type( $filename ) ) {
+				return false;
+			}
+
+			if ( ! is_array( $types ) ) {
+				$types = [ $types ];
+			}
+
+			$types = array_map( 'strtolower', $types );
+
+			if ( in_array( $filetype, $types ) ) {
+				$return = true;
+			}
+
+			$parts = explode( '/', $filetype );
+
+			// if any of the parts of the mime type match the provided types, return true
+			if ( array_intersect( $parts, $types ) ) {
+				$return = true;
+			}
+
+			return apply_filters( 'cp_is_file_type', $return, $filename, $filetype );
+		}
+
 
 	}
 

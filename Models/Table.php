@@ -515,6 +515,7 @@ abstract class Table {
 	 * @return bool
 	 * @throws Exception
 	 * @since  1.0.0
+	 * @update 1.0.10 updated to remove meta when deleting the item
 	 *
 	 * @author Tanner Moushey
 	 */
@@ -524,10 +525,13 @@ abstract class Table {
 
 		do_action( 'cp_post_delete_before', $this );
 
+		// delete all meta
+		$this->delete_all_meta( $this->id, $this->type . '_id' );
+
+		// delete the item
 		if ( false === $wpdb->query( $wpdb->prepare( "DELETE FROM " . static::get_prop('table_name' ) . " WHERE " . static::get_prop('primary_key' ) . " = %d", $this->id ) ) ) {
 			throw new Exception( sprintf( 'The row (%d) was not deleted.', absint( $this->id ) ) );
 		}
-
 
 		$this->delete_cache();
 		wp_cache_delete( $this->id, static::get_prop( 'cache_group' ) . '_meta' );

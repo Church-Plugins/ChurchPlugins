@@ -175,7 +175,14 @@ class _Init {
 
 		$import->map_fields( $map['cp-import-field'] );
 
-		$ret = $import->process_step( $step );
+		$options = array(
+			'sideload_audio'    => isset( $map['sideload-audio-urls'] ) && $map['sideload-audio-urls'] == 'on',
+			'stop_on_error'     => isset( $map['stop-on-error'] ) && $map['stop-on-error'] == 'on',
+		);
+
+		$options = apply_filters( 'cp_do_ajax_import_options', $options, $map, $step, $class );
+
+		$ret = $import->process_step( $step, $options );
 
 		$percentage = $import->get_percentage_complete();
 
