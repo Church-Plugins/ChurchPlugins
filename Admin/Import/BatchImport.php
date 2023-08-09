@@ -127,13 +127,20 @@ class BatchImport {
 	 * Parses the CSV from the file and returns the data as an array.
 	 *
 	 * @since 1.0.6
+	 * @updated 1.0.15 to use fgetcsv instead of str_getcsv
 	 *
 	 * @param string $file
 	 *
 	 * @return array
 	 */
 	public function get_csv_file( $file ) {
-		$csv = array_map( 'str_getcsv', file( $this->file ) );
+		$csv_file = fopen( $this->file, 'r' );
+		$csv = [];
+
+		while( $line = fgetcsv( $csv_file ) ) {
+			$csv[] = $line;
+		};
+
 		array_walk(
 			$csv,
 			function ( &$a ) use ( $csv ) {
@@ -229,6 +236,7 @@ class BatchImport {
 	 * Get the mapped value for the provided field
 	 *
 	 * @since  1.0.6
+	 * @updated 1.0.15 to include cleaning field value
 	 *
 	 * @param $row
 	 *
@@ -247,10 +255,45 @@ class BatchImport {
 		}
 
 		if ( isset( $row[ $this->field_mapping[ $key ] ] ) ) {
-			return $row[ $this->field_mapping[ $key ] ];
+			return $this->clean_field_value( $row[ $this->field_mapping[ $key ] ] );
 		}
 
 		return $default;
+	}
+
+	/**
+	 * Clean out the field value in case the CSV was encoded with escapes that will not be load friendly.
+	 *
+	 * @param $encoded_field_value
+	 *
+	 * @return string
+	 * @since 1.0.15
+	 *
+	 * @author Wayne Anderson, Tanner Moushey
+	 */
+	public function clean_field_value( $encoded_field_value = '' ) {
+
+		if ( strlen( $encoded_field_value ) < 3 ) {
+			// Short or default-value empty string doesn't have the length for us to test and likely doesn't need decoded.
+			return $encoded_field_value;
+		}
+
+		// If this value starts or ends with a quotation mark, or an encoded/escaped quotation mark, remove them.
+		$decoded_field_value = ltrim( $encoded_field_value, '\"');
+		$decoded_field_value = ltrim( $decoded_field_value, '"');
+		$decoded_field_value = rtrim( $decoded_field_value, '\"');
+		$decoded_field_value = rtrim( $decoded_field_value, '"');
+
+		// Eliminate escaped single quotation marks.
+		$decoded_field_value = str_replace( "\'", "", $decoded_field_value );
+
+		// Eliminate quotation marks within the text.
+		$decoded_field_value = str_replace( "\"", "", $decoded_field_value );
+
+		// Replace escaped newlines with real new lines.
+		$decoded_field_value = str_replace( "\\\\n", "\n", $decoded_field_value );
+
+		return $decoded_field_value;
 	}
 
 	/**

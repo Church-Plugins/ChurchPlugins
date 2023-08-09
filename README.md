@@ -6,6 +6,9 @@ Common utility and helper functions.
 **License:**           GPLv2 or later
 **License URI:**       [http://www.gnu.org/licenses/gpl-2.0.html](http://www.gnu.org/licenses/gpl-2.0.html)
 
+### 1.0.15 - 8/09/2023
+* Fix issues with importer
+
 ### 1.0.13 - 5/23/2023
 * Add import method to break on error
 * Always unlink the temp file after processing on import
