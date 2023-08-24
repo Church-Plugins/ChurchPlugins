@@ -71,8 +71,8 @@ class Init {
 	protected function actions() {
 		add_action( 'admin_init', [ $this, 'update_install' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'register_scripts'], 5 );
-		add_action( 'wp_enqueue_scripts', [ $this, 'register_icons' ], 5 );
-		add_action( 'admin_enqueue_scripts', [ $this, 'register_icons' ], 5 );
+		add_action( 'wp_enqueue_scripts', [ $this, 'register_icons' ], -99 );
+		add_action( 'admin_enqueue_scripts', [ $this, 'register_icons' ], -99 );
 		add_action( 'script_loader_tag', [ $this, 'defer_scripts' ], 10, 3 );
 	}
 
