@@ -71,6 +71,7 @@ class Init {
 	protected function actions() {
 		add_action( 'admin_init', [ $this, 'update_install' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'register_scripts'], 5 );
+		add_action( 'wp_enqueue_scripts', [ $this, 'register_scripts'], 5 );
 		add_action( 'wp_enqueue_scripts', [ $this, 'register_material_icons' ], 5 );
 		add_action( 'admin_enqueue_scripts', [ $this, 'register_material_icons' ], 5 );
 	}
@@ -91,6 +92,7 @@ class Init {
 
 	public function register_scripts() {
 		wp_register_script( 'cp-admin-tools-import', CHURCHPLUGINS_URL . 'assets/js/admin/tools/import.js', array( 'jquery', 'jquery-form', 'underscore' ), CHURCHPLUGINS_VERSION  );
+		wp_register_script( 'cp-infinite-scroll', CHURCHPLUGINS_URL . 'assets/js/infinite-scroll.js', array( 'jquery', ), CHURCHPLUGINS_VERSION  );
 	}
 
 	/**
