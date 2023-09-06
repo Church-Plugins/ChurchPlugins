@@ -1,9 +1,25 @@
+/**
+ * ChurchPlugins Infinite Scroll
+ * 
+ * Usage: create an element with the class cp-infinite-scroll in order for it to be picked up by this script.
+ * 
+ * The element must have a data-url attribute that points to an AJAX endpoint (most likely admin-ajax.php)
+ * It also must have a data-config attribute that contains a JSON object with the AJAX config.
+ * The AJAX endpoint should expect a page parameter, and should display content based on the page.
+ * If the AJAX endpoint returns no content, the scroll listener assume the content is ended and will stop.
+ */
 
 (function($) {
 	class InfiniteScroll {
 		constructor(el) {
 			this.el = $(el);
+
 			this.url = new URL(el.dataset.url);
+
+			if( ! el.dataset.config ) {
+				throw new Error("InfiniteScroll expects an AJAX config.");
+			}
+			
 			this.config = JSON.parse(el.dataset.config);
 			this.page = 0;
 			this.done = false;
