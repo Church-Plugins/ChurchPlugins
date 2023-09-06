@@ -23,13 +23,13 @@
 			this.config = JSON.parse(el.dataset.config);
 			this.page = 0;
 			this.done = false;
-			this.loading = true;
+			this._loading = false;
 			this.nextPage();
 			window.addEventListener('scroll', this.scrollListener.bind(this));
 		}
 	
 		nextPage() {
-			if( this.done ) return;
+			if( this.loading || this.done ) return;
 			this.page++;
 			this.config.page = this.page;
 			this.loading = true;
@@ -72,10 +72,17 @@
 		set loading(val) {
 			if( val ) {
 				this.el.addClass('loading');
+				this.el.append('<div class="cp-infinite-scroll-loading"></div>');
 			}
 			else {
 				this.el.removeClass('loading');
+				this.el.find('.cp-infinite-scroll-loading').remove();
 			}
+			this._loading = val;
+		}
+
+		get loading() {
+			return this._loading;
 		}
 	}
 
