@@ -2,10 +2,14 @@
 Common utility and helper functions.
 
 **Contributors:**      [tannerm](https://github.com/tannerm)
-**Stable tag:**        1.0.2
+**Stable tag:**        1.0.16
 **License:**           GPLv2 or later
 **License URI:**       [http://www.gnu.org/licenses/gpl-2.0.html](http://www.gnu.org/licenses/gpl-2.0.html)
 
+### 1.0.16 - 9/28/2023
+* Fix deprication error
+* Register styles and scripts for plugins
+ 
 ### 1.0.15 - 8/09/2023
 * Fix issues with importer
 
