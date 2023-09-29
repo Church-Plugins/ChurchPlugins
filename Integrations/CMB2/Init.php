@@ -65,13 +65,8 @@ class Init {
 		$desc = $field_type_object->field->args['description'];
 		$field_type_object->field->args['desc'] = $field_type_object->field->args['description'] = '';
 
-		$args = [];
-		if ( $field->args['is_active'] ) {
-			$args['disabled'] = 'disabled';
-		}
-
 		$render_class = $field_type_object->get_new_render_type( 'text', 'CMB2_Type_Text' );
-		echo $render_class->render( $args );
+		echo $render_class->render();
 
 		if ( $field->args['nonce'] ) {
 			echo $field->args['nonce'];

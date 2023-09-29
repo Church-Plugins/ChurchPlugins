@@ -9,7 +9,8 @@ Common utility and helper functions.
 ### 1.0.16 - 9/28/2023
 * Fix deprication error
 * Register styles and scripts for plugins
- 
+* Updater now supports beta updates
+
 ### 1.0.15 - 8/09/2023
 * Fix issues with importer
 
