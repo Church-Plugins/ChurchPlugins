@@ -191,6 +191,7 @@ abstract class PostType {
 	 */
 	public function add_actions() {
 		add_action( 'cmb2_admin_init', [ $this, 'register_metaboxes' ] );
+		add_action( 'cmb2_init', [ $this, 'register_metaboxes' ] );
 
 		add_action( 'rest_cp_item_query', [ $this, 'rest_request_limit' ], 10, 1 );
 		add_action( "save_post", [ $this, 'maybe_save_post' ], 50 );
