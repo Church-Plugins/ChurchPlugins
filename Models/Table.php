@@ -13,6 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  * @author Tanner Moushey
  * @since  1.0
 */
+#[\AllowDynamicProperties]
 abstract class Table {
 
 	/**
