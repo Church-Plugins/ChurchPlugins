@@ -137,7 +137,7 @@ class Init {
 	 * Return the list of options, with selected options at the top preserving their order. This also handles the
 	 * removal of selected options which no longer exist in the options array.
 	 */
-	public function get_pw_multiselect_options( $field_escaped_value = array(), $field_type_object ) {
+	public function get_pw_multiselect_options( $field_escaped_value, $field_type_object ) {
 		$options = (array) $field_type_object->field->options();
 
 		// If we have selected items, we need to preserve their order
