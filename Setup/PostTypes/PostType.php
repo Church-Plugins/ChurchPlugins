@@ -171,6 +171,7 @@ abstract class PostType {
 				'new_item'           => 'New ' . $single,
 				'view'               => 'View',
 				'view_item'          => 'View ' . $single,
+				'view_items'         => 'View ' . $plural,
 				'search_items'       => 'Search ' . $plural,
 				'not_found'          => 'No ' . $plural . ' found',
 				'not_found_in_trash' => 'No ' . $plural . ' found in Trash',
