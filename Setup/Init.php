@@ -72,8 +72,9 @@ class Init {
 		add_action( 'admin_init', [ $this, 'update_install' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'register_scripts'], 5 );
 		add_action( 'wp_enqueue_scripts', [ $this, 'register_scripts'], 5 );
-		add_action( 'wp_enqueue_scripts', [ $this, 'register_material_icons' ], 5 );
-		add_action( 'admin_enqueue_scripts', [ $this, 'register_material_icons' ], 5 );
+		add_action( 'wp_enqueue_scripts', [ $this, 'register_icons' ], -99 );
+		add_action( 'admin_enqueue_scripts', [ $this, 'register_icons' ], -99 );
+		add_action( 'script_loader_tag', [ $this, 'defer_scripts' ], 10, 3 );
 	}
 
 	/**
@@ -96,10 +97,31 @@ class Init {
 	}
 
 	/**
-         * Registers the material icons stylesheet
+  	 * Registers icons scripts and stylesheets to make them available to plugins that use ChurchPlugins core
 	 */
-	public function register_material_icons() {
+	public function register_icons() {
 		wp_register_style( 'material-icons', 'https://fonts.googleapis.com/css?family=Material+Icons|Material+Icons+Outlined' );
+		wp_register_script( 'feather-icons-external', 'https://cdnjs.cloudflare.com/ajax/libs/feather-icons/4.29.0/feather.min.js' );
+		wp_register_script( 'feather-icons', CHURCHPLUGINS_URL . 'assets/js/feather-icons.js', array( 'feather-icons-external' ) );
+	}
+
+
+	/**
+	 * Adds defer attribute to scripts
+	 */
+	public function defer_scripts( $tag, $handle, $src ) {
+		/**
+		 * Script handles whose resulting script tags will have a defer attribute
+		 * 
+		 * @param array $scripts list of script handles
+		 */
+		$scripts = apply_filters( 'cp_defer_scripts', array( 'feather-icons' ) );
+
+		if( in_array( $handle, $scripts ) ) {
+			return sprintf( '<script src="%1$s" defer type="text/javascript"></script>', $src );
+		}
+
+		return $tag;
 	}
 
 	/**

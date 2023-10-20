@@ -70,10 +70,28 @@ class Updater {
 	public function init() {
 
 		add_filter( 'pre_set_site_transient_update_plugins', array( $this, 'check_update' ) );
+		add_filter( 'delete_site_transient_update_plugins', array( $this, 'flush_cache' ) );
 		add_filter( 'plugins_api', array( $this, 'plugins_api_filter' ), 10, 3 );
 		add_action( 'after_plugin_row', array( $this, 'show_update_notification' ), 10, 2 );
 		add_action( 'admin_init', array( $this, 'show_changelog' ) );
 
+		// this class is run on admin_init
+		if ( ! empty( $_GET['force-check' ] ) ) {
+			$this->flush_cache();
+		}
+
+	}
+
+	/**
+	 * Delete the current plugin version cache
+	 *
+	 * @since  1.0.16
+	 *
+	 * @author Tanner Moushey, 9/29/23
+	 */
+	public function flush_cache() {
+		delete_option( $this->get_cache_key() );
+		delete_option( $this->failed_request_cache_key );
 	}
 
 	/**
@@ -94,7 +112,7 @@ class Updater {
 		global $pagenow;
 
 		if ( ! is_object( $_transient_data ) ) {
-			$_transient_data = new stdClass();
+			$_transient_data = new \stdClass();
 		}
 
 		if ( ! empty( $_transient_data->response ) && ! empty( $_transient_data->response[ $this->name ] ) && false === $this->wp_override ) {

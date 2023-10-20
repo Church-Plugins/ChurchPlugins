@@ -171,6 +171,7 @@ abstract class PostType {
 				'new_item'           => 'New ' . $single,
 				'view'               => 'View',
 				'view_item'          => 'View ' . $single,
+				'view_items'         => 'View ' . $plural,
 				'search_items'       => 'Search ' . $plural,
 				'not_found'          => 'No ' . $plural . ' found',
 				'not_found_in_trash' => 'No ' . $plural . ' found in Trash',
@@ -191,6 +192,7 @@ abstract class PostType {
 	 */
 	public function add_actions() {
 		add_action( 'cmb2_admin_init', [ $this, 'register_metaboxes' ] );
+		add_action( 'cmb2_init', [ $this, 'register_metaboxes' ] );
 
 		add_action( 'rest_cp_item_query', [ $this, 'rest_request_limit' ], 10, 1 );
 		add_action( "save_post", [ $this, 'maybe_save_post' ], 50 );

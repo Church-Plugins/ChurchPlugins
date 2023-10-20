@@ -65,13 +65,8 @@ class Init {
 		$desc = $field_type_object->field->args['description'];
 		$field_type_object->field->args['desc'] = $field_type_object->field->args['description'] = '';
 
-		$args = [];
-		if ( $field->args['is_active'] ) {
-			$args['disabled'] = 'disabled';
-		}
-
 		$render_class = $field_type_object->get_new_render_type( 'text', 'CMB2_Type_Text' );
-		echo $render_class->render( $args );
+		echo $render_class->render();
 
 		if ( $field->args['nonce'] ) {
 			echo $field->args['nonce'];
@@ -137,7 +132,7 @@ class Init {
 	 * Return the list of options, with selected options at the top preserving their order. This also handles the
 	 * removal of selected options which no longer exist in the options array.
 	 */
-	public function get_pw_multiselect_options( $field_escaped_value = array(), $field_type_object ) {
+	public function get_pw_multiselect_options( $field_escaped_value, $field_type_object ) {
 		$options = (array) $field_type_object->field->options();
 
 		// If we have selected items, we need to preserve their order

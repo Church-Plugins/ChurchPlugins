@@ -81,7 +81,7 @@ class License {
 
 	public function license_field( $cmb ) {
 		$args = [
-			'name'        => 'License Key',
+			'name'        => __( 'License Key', 'Church Plugins' ),
 			'id'          => 'license',
 			'type'        => 'license',
 			'nonce'       => false,
@@ -89,6 +89,7 @@ class License {
 			'button_type' => 'secondary',
 			'button_text' => '',
 			'is_active'   => $this->is_active(),
+			'attributes'  => [],
 		];
 
 		if ( $this->get( 'license' ) ) {
@@ -97,6 +98,9 @@ class License {
 			if ( $this->is_active() ) {
 				$args['button_name'] = $this->get_deactivate_slug();
 				$args['button_text'] = __( 'Deactivate License', 'Church Plugins' );
+
+				$args['attributes']['disabled'] = 'disabled';
+				$args['save_field'] = false; // disable saving of if we have the textarea disabled
 			} else {
 				$args['button_name'] = $this->get_activate_slug();
 				$args['button_type'] = 'primary';
@@ -105,6 +109,12 @@ class License {
 		}
 
 		$cmb->add_field( $args );
+		$cmb->add_field( [
+			'name' => __( 'Enable Beta Updates', 'Church Plugins' ),
+			'id'   => 'beta',
+			'type' => 'checkbox',
+			'desc' => __( 'Check this box to enable beta updates.', 'Church Plugins' ),
+		] );
 	}
 
 	/**
@@ -340,7 +350,8 @@ class License {
 				'version' => $data['Version'],    // current version number
 				'license' => $this->get( 'license' ),     // license key (used get_option above to retrieve from DB)
 				'item_id' => urlencode( $this->edd_id ), // the name of our product in EDD
-				'author'  => $data['AuthorName']  // author of this plugin
+				'author'  => $data['AuthorName'],  // author of this plugin
+				'beta'    => boolval( $this->get( 'beta', false ) ),
 			)
 		);
 
