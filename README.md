@@ -7,7 +7,12 @@ Common utility and helper functions.
 **License URI:**       [http://www.gnu.org/licenses/gpl-2.0.html](http://www.gnu.org/licenses/gpl-2.0.html)
 
 ### 1.0.16 - 9/28/2023
-* Fix deprication error
+* Fix deprecated parameter
+* Add support for infinite scroll
+* Update 'view_items' label
+
+### 1.0.16 - 9/28/2023
+* Fix deprecation error
 * Register styles and scripts for plugins
 * Updater now supports beta updates
 
