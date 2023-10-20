@@ -1,0 +1,23 @@
+.cp-infinite-scroll-loading {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	height: 5em;
+	padding: var(--cp-gap--sm);
+
+	&::after {
+		content: '';
+		display: block;
+		padding: 1em;
+		border-radius: 50%;
+		border: .3em solid var(--cp-color-ui-secondary);
+		border-top-color: transparent;
+		animation: spin 1s linear infinite;
+	}
+
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+}
