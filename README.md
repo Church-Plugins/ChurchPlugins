@@ -6,10 +6,8 @@ Common utility and helper functions.
 **License:**           GPLv2 or later
 **License URI:**       [http://www.gnu.org/licenses/gpl-2.0.html](http://www.gnu.org/licenses/gpl-2.0.html)
 
-### 1.0.16 - 9/28/2023
-* Fix deprecated parameter
-* Add support for infinite scroll
-* Update 'view_items' label
+### 1.0.18 - 11/17/2023
+* Add Helper function to output pagination with smooth scrolling disabled
 
 ### 1.0.16 - 9/28/2023
 * Fix deprecation error

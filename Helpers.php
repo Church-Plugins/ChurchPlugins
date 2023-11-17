@@ -921,6 +921,42 @@ if ( ! class_exists( 'ChurchPlugins\Helpers' ) ) :
 			return apply_filters( 'cp_is_file_type', $return, $filename, $filetype );
 		}
 
+		/**
+		 * Output the posts pagination with the smooth scroll disabled
+		 *
+		 * @since  1.0.18
+		 *
+		 * @param $args
+		 *
+		 * @author Tanner Moushey, 11/17/23
+		 */
+		public static function safe_posts_pagination( $args ) {
+			add_filter( 'paginate_links_output', [ __CLASS__, 'safe_posts_pagination_classes' ] );
+
+			the_posts_pagination( $args );
+
+			remove_filter( 'paginate_links_output', [ __CLASS__, 'safe_posts_pagination_classes' ] );
+		}
+
+		/**
+		 * Add classes to the pagination links to disable smooth scroll
+		 *
+		 * Some themes (like Divi) will prevent the page from reloading if an anchor is present in the URL.
+		 *
+		 * @since  1.0.18
+		 *
+		 * @param $output
+		 *
+		 * @return array|string|string[]
+		 * @author Tanner Moushey, 11/17/23
+		 */
+		public static function safe_posts_pagination_classes( $output ) {
+			$link_classes = apply_filters( 'cp_safe_posts_pagination_classes', [ 'et_smooth_scroll_disabled' ] );
+
+			$output = str_replace( 'page-numbers"', 'page-numbers ' . implode( ' ', $link_classes ) . '"', $output );
+
+			return $output;
+		}
 
 	}
 
