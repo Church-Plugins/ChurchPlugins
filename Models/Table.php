@@ -506,7 +506,9 @@ abstract class Table {
 	public function delete_all_meta( $value, $column ) {
 		global $wpdb;
 
-		wp_cache_delete( $this->id, static::get_prop( 'cache_group' ) . '_meta' );
+		if ( $this->id ) {
+			wp_cache_delete( $this->id, static::get_prop( 'cache_group' ) . '_meta' );
+		}
 
 		return $wpdb->query( $wpdb->prepare( "DELETE FROM " . $this->meta_table_name . " WHERE `{$column}` = %s", $value ) );
 	}
