@@ -112,7 +112,7 @@ class Init {
 	public function defer_scripts( $tag, $handle, $src ) {
 		/**
 		 * Script handles whose resulting script tags will have a defer attribute
-		 * 
+		 *
 		 * @param array $scripts list of script handles
 		 */
 		$scripts = apply_filters( 'cp_defer_scripts', array( 'feather-icons' ) );
@@ -149,12 +149,14 @@ class Init {
 	 *
 	 * - Make sure database is installed and up-to-date
 	 *
+	 * @updated 1.0.18
+	 *
 	 * @return void
 	 * @author tanner
 	 */
-	public function update_install() {
+	public function update_install( $force = false ) {
 
-		if ( ! is_admin() ) {
+		if ( ! is_admin() && ! $force ) {
 			return;
 		}
 
@@ -164,7 +166,7 @@ class Init {
 
 		$needs_check = apply_filters( 'cp_table_needs_check', CHURCHPLUGINS_VERSION !== $table_check );
 
-		if ( $needs_check ) {
+		if ( $needs_check || $force ) {
 
 			foreach( $tables as $table ) {
 				if ( ! @$table->installed() ) {
