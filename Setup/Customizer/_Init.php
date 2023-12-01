@@ -115,6 +115,10 @@ final class _Init {
 			return;
 		}
 
+		if ( ! class_exists( 'WP_Customize_Control' ) ) {
+			require_once( ABSPATH . 'wp-includes/class-wp-customize-control.php' );
+		}
+
 		require_once( 'Controls/_Control.php' );
 		require_once( 'Controls/Heading.php' );
 		require_once( 'Controls/Number.php' );
@@ -277,7 +281,7 @@ final class _Init {
 	 * @return boolean
 	 */
 	public function is_active() {
-		$active = class_exists( 'WP_Customize_Manager' );
+		$active = true;
 
 		/**
 		 * Allows Developers to completely deactivate Church Plugins Customizer
