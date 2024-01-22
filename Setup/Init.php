@@ -65,6 +65,15 @@ class Init {
 
 		require_once( CHURCHPLUGINS_DIR . 'Setup/Taxonomies/Taxonomy.php' );
 
+		require_once( CHURCHPLUGINS_DIR . 'RequestAPI/Base.php' );
+		require_once( CHURCHPLUGINS_DIR . 'RequestAPI/Exception.php' );
+		require_once( CHURCHPLUGINS_DIR . 'RequestAPI/InterfaceRequest.php' );
+		require_once( CHURCHPLUGINS_DIR . 'RequestAPI/InterfaceResponse.php' );
+		require_once( CHURCHPLUGINS_DIR . 'RequestAPI/RequestJSON.php' );
+		require_once( CHURCHPLUGINS_DIR . 'RequestAPI/ResponseJSON.php' );
+		require_once( CHURCHPLUGINS_DIR . 'RequestAPI/RequestXML.php' );
+		require_once( CHURCHPLUGINS_DIR . 'RequestAPI/ResponseXML.php' );
+
 		$this->customizer = Customizer\_Init::get_instance();
 	}
 
