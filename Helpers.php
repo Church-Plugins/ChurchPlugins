@@ -605,6 +605,8 @@ if ( ! class_exists( 'ChurchPlugins\Helpers' ) ) :
 		 * @param        $key
 		 * @param string | array $default
 		 *
+		 * @updated 1.0.20 - Added sanitization function for XSS
+		 *
 		 * @return string | array
 		 */
 		public static function get_param( $array, $key, $default = '' ) {
@@ -614,7 +616,7 @@ if ( ! class_exists( 'ChurchPlugins\Helpers' ) ) :
 				$value = $array[ $key ];
 			}
 
-			return apply_filters( 'sc_param_get', $value, $array, $key, $default );
+			return apply_filters( 'sc_param_get', _sanitize_text_fields( $value, true ), $array, $key, $default );
 		}
 
 		/**

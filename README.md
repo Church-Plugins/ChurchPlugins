@@ -6,6 +6,9 @@ Common utility and helper functions.
 **License:**           GPLv2 or later
 **License URI:**       [http://www.gnu.org/licenses/gpl-2.0.html](http://www.gnu.org/licenses/gpl-2.0.html)
 
+### 1.0.20 - 1/29/2024
+* Protect against XSS when retrieving $_GET, $_POST, and $_REQUEST data.
+
 ### 1.0.19 - 11/30/2023
 * Add force option to update_install
 
