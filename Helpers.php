@@ -616,7 +616,13 @@ if ( ! class_exists( 'ChurchPlugins\Helpers' ) ) :
 				$value = $array[ $key ];
 			}
 
-			return apply_filters( 'sc_param_get', _sanitize_text_fields( $value, true ), $array, $key, $default );
+			if ( is_array( $value ) ) {
+				$value = self::array_map_recursive( '_sanitize_text_fields', $value );
+			} else {
+				$value = _sanitize_text_fields( $value, true );
+			}
+
+			return apply_filters( 'sc_param_get', $value, $array, $key, $default );
 		}
 
 		/**
@@ -656,6 +662,26 @@ if ( ! class_exists( 'ChurchPlugins\Helpers' ) ) :
 		public static function get_site_name() {
 
 			return ( is_multisite() ) ? get_blog_details()->blogname : get_bloginfo( 'name' );
+		}
+
+		/**
+		 * Recursively apply a callback to all elements of an array
+		 *
+		 * @since  1.0.20
+		 *
+		 * @param $callback
+		 * @param $array
+		 *
+		 * @return array
+		 * @author Tanner Moushey, 1/29/24
+		 */
+		public static function array_map_recursive( $callback, $array ) {
+			$new = array();
+			foreach ( $array as $key => $value ) {
+				$new[ $key ] = ( is_array( $value ) ? self::array_map_recursive( $callback, $value ) : call_user_func( $callback, $value ) );
+			}
+
+			return $new;
 		}
 
 		/**
