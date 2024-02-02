@@ -31,6 +31,13 @@ class BatchImport {
 	public $file;
 
 	/**
+	 * Whether we are done importing or not
+	 *
+	 * @since 1.0.6
+	 */
+	public $done;
+
+	/**
 	 * The current row we are looking at
 	 *
 	 * @since 1.0.6
