@@ -26,7 +26,7 @@ class SourceMeta extends Table  {
 	public function __construct() {
 		global $wpdb;
 
-		$this->table_name = $wpdb->base_prefix . 'cp_source_meta';
+		$this->table_name = $wpdb->prefix . 'cp_source_meta';
 		$this->version    = '1.0';
 
 		parent::__construct();

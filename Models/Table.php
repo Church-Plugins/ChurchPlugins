@@ -83,7 +83,7 @@ abstract class Table {
 	public function init() {
 		global $wpdb;
 
-		$this->prefix = apply_filters( 'cp_table_prefix', $wpdb->base_prefix, $this );
+		$this->prefix = apply_filters( 'cp_table_prefix', $wpdb->prefix, $this );
 		$this->cache_group = $this->post_type;
 		$this->cache_group_origin = $this->cache_group . '_origin';
 		$this->table_name  = $this->prefix . 'cp_' . $this->type;

@@ -68,7 +68,7 @@ abstract class Table {
 	 */
 	public function __construct() {
 		global $wpdb;
-		$this->prefix = apply_filters( 'cp_table_prefix', $wpdb->base_prefix, $this );
+		$this->prefix = apply_filters( 'cp_table_prefix', $wpdb->prefix, $this );
 	}
 
 	/**
