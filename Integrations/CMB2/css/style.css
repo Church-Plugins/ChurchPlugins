@@ -7,3 +7,14 @@
 .cmb-type-pw-multiselect .select2-selection__choice {
 	cursor: move !important;
 }
+
+.cp-social-links--item {
+	display: flex;
+	gap: 8px;
+	padding: 2px 0;
+}
+
+.cp-social-links--item input,
+.cp-social-links--item select {
+	margin: 0;
+}

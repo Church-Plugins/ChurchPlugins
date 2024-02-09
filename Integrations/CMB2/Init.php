@@ -52,9 +52,9 @@ class Init {
 		add_filter( 'cmb2_sanitize_pw_multiselect', array( $this, 'pw_multiselect_sanitize' ), 10, 4 );
 		add_filter( 'cmb2_types_esc_pw_multiselect', array( $this, 'pw_multiselect_escaped_value' ), 10, 3 );
 		add_filter( 'cmb2_repeat_table_row_types', array( $this, 'pw_multiselect_table_row_class' ), 10, 1 );
-		add_filter( 'cmb2_render_cp_social_links', array( $this, 'cp_social_links' ), 10, 5 );
-		add_filter( 'cmb2_sanitize_cp_social_links', array( $this, 'cp_social_links_sanitize' ), 10, 4 );
-		add_filter( 'cmb2_types_esc_cp_social_links', array( $this, 'cp_social_links_escaped_value' ), 10, 3 );
+		add_filter( 'cmb2_render_cp_social_links', array( $this, 'cp_social_links' ), 10, 2 );
+		add_filter( 'cmb2_sanitize_cp_social_links', array( $this, 'cp_social_links_sanitize' ), 10, 2 );
+		add_filter( 'cmb2_types_esc_cp_social_links', array( $this, 'cp_social_links_escaped_value' ), 10, 2 );
 
 		add_action( 'admin_enqueue_scripts', [ $this, 'admin_scripts' ] );
 	}
@@ -227,12 +227,11 @@ class Init {
 	/**
 	 * Handle escaping for cp_social_links field
 	 *
-	 * @param string $check
-	 * @param mixed  $meta_value
-	 * @param array  $field_args
+	 * @param string $check Whether to perform default escaping.
+	 * @param mixed  $meta_value The value to be escaped.
 	 * @since 1.2.0
 	 */
-	public function cp_social_links_escaped_value( $check, $meta_value, $field_args ) {
+	public function cp_social_links_escaped_value( $check, $meta_value ) {
 		if ( ! is_array( $meta_value ) ) {
 			return $check;
 		}
@@ -248,12 +247,11 @@ class Init {
 	/**
 	 * Sanitize the value of the cp_social_links field
 	 *
-	 * @param mixed  $check
-	 * @param mixed  $meta_value
-	 * @param int    $object_id
-	 * @param array  $field_args
+	 * @param mixed $check Whether or not to proceed with default sanitization.
+	 * @param mixed $meta_value The value to be sanitized.
+	 * @since 1.2.0
 	 */
-	public function cp_social_links_sanitize( $check, $meta_value, $object_id, $field_args ) {
+	public function cp_social_links_sanitize( $check, $meta_value ) {
 		if ( ! is_array( $meta_value ) ) {
 			return $check;
 		}
@@ -273,13 +271,11 @@ class Init {
 	/**
 	 * Render a social links field
 	 *
-	 * @param \CMB2_Field $field
-	 * @param mixed       $escaped_value
-	 * @param int         $object_id
-	 * @param string      $object_type
-	 * @param \CMB2_Types $field_type_object
+	 * @param \CMB2_Field $field The field object.
+	 * @param mixed       $escaped_value Escaped value of the field.
+	 * @since 1.2.0
 	 */
-	public function cp_social_links( $field, $escaped_value, $object_id, $object_type, $field_type_object ) {
+	public function cp_social_links( $field, $escaped_value ) {
 		$this->setup_admin_scripts();
 
 		$supported_networks = array(
