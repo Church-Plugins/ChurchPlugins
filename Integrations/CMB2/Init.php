@@ -52,6 +52,9 @@ class Init {
 		add_filter( 'cmb2_sanitize_pw_multiselect', array( $this, 'pw_multiselect_sanitize' ), 10, 4 );
 		add_filter( 'cmb2_types_esc_pw_multiselect', array( $this, 'pw_multiselect_escaped_value' ), 10, 3 );
 		add_filter( 'cmb2_repeat_table_row_types', array( $this, 'pw_multiselect_table_row_class' ), 10, 1 );
+		add_filter( 'cmb2_render_cp_social_links', array( $this, 'cp_social_links' ), 10, 5 );
+		add_filter( 'cmb2_sanitize_cp_social_links', array( $this, 'cp_social_links_sanitize' ), 10, 4 );
+		add_filter( 'cmb2_types_esc_cp_social_links', array( $this, 'cp_social_links_escaped_value' ), 10, 3 );
 
 		add_action( 'admin_enqueue_scripts', [ $this, 'admin_scripts' ] );
 	}
@@ -219,6 +222,110 @@ class Init {
 		$check[] = 'pw_multiselect';
 
 		return $check;
+	}
+
+	/**
+	 * Handle escaping for cp_social_links field
+	 *
+	 * @param string $check
+	 * @param mixed  $meta_value
+	 * @param array  $field_args
+	 * @since 1.2.0
+	 */
+	public function cp_social_links_escaped_value( $check, $meta_value, $field_args ) {
+		if ( ! is_array( $meta_value ) ) {
+			return $check;
+		}
+
+		foreach ( $meta_value as $key => $val ) {
+			$meta_value[ $key ]['network'] = esc_attr( $val['network'] );
+			$meta_value[ $key ]['url']     = esc_url( $val['url'] );
+		}
+
+		return $meta_value;
+	}
+
+	/**
+	 * Sanitize the value of the cp_social_links field
+	 *
+	 * @param mixed  $check
+	 * @param mixed  $meta_value
+	 * @param int    $object_id
+	 * @param array  $field_args
+	 */
+	public function cp_social_links_sanitize( $check, $meta_value, $object_id, $field_args ) {
+		if ( ! is_array( $meta_value ) ) {
+			return $check;
+		}
+
+		$sanitized = array();
+
+		foreach ( $meta_value as $link ) {
+			$sanitized[] = array(
+				'network' => sanitize_text_field( $link['network'] ),
+				'url'     => esc_url( $link['url'] ),
+			);
+		}
+
+		return $sanitized;
+	}
+
+	/**
+	 * Render a social links field
+	 *
+	 * @param \CMB2_Field $field
+	 * @param mixed       $escaped_value
+	 * @param int         $object_id
+	 * @param string      $object_type
+	 * @param \CMB2_Types $field_type_object
+	 */
+	public function cp_social_links( $field, $escaped_value, $object_id, $object_type, $field_type_object ) {
+		$this->setup_admin_scripts();
+
+		$supported_networks = array(
+			'facebook'  => __( 'Facebook', 'cp-staff' ),
+			'instagram' => __( 'Instagram', 'cp-staff' ),
+			'linkedin'  => __( 'LinkedIn', 'cp-staff' ),
+			'pinterest' => __( 'Pinterest', 'cp-staff' ),
+			'twitter'   => __( 'Twitter (X)', 'cp-staff' ),
+			'vimeo'     => __( 'Vimeo', 'cp-staff' ),
+			'youtube'   => __( 'YouTube', 'cp-staff' ),
+		);
+
+		$field_id   = $field->args['id'];
+		$links      = is_array( $escaped_value ) ? $escaped_value : array();
+		$link_count = count( $links );
+		?>
+		<p class="cmb2-metabox-description"><?php echo esc_html( $field->args['desc'] ); ?></p>
+		<div class="cp-social-links">
+			<template class="cp-social-links--template">
+				<div class="cp-social-links--item">
+					<select name="<?php echo esc_attr( $field_id ); ?>[ID][network]">
+						<?php foreach ( $supported_networks as $key => $label ) : ?>
+							<option value="<?php echo esc_attr( $key ); ?>"><?php echo esc_html( $label ); ?></option>
+						<?php endforeach; ?>
+						<input type="text" name="<?php echo esc_attr( $field_id ); ?>[ID][url]" />
+						<button class="button button-secondary cp-social-links--remove"><?php esc_html_e( 'Remove', 'cp-staff' ); ?></button>
+					</select>
+				</div>
+			</template>
+			<div class="cp-social-links--list">
+				<?php for ( $i = 0; $i < $link_count; $i++ ) : ?>
+					<?php $link = $links[ $i ]; ?>
+					<div class="cp-social-links--item">
+						<select name="<?php echo esc_attr( $field_id ); ?>[<?php echo absint( $i ); ?>][network]">
+							<?php foreach ( $supported_networks as $key => $label ) : ?>
+								<option value="<?php echo esc_attr( $key ); ?>" <?php selected( $link['network'], $key ); ?>><?php echo esc_html( $label ); ?></option>
+							<?php endforeach; ?>
+						</select>
+						<input type="text" name="<?php echo esc_attr( $field_id ); ?>[<?php echo absint( $i ); ?>][url]" value="<?php echo esc_attr( $link['url'] ); ?>" />
+						<button class="button button-secondary cp-social-links--remove"><?php esc_html_e( 'Remove', 'cp-staff' ); ?></button>
+					</div>
+				<?php endfor; ?>
+			</div>
+			<button class="button button-secondary cp-social-links--add" style="margin-top: 8px;"><?php esc_html_e( 'Add', 'cp-staff' ); ?></button>
+		</div>
+		<?php
 	}
 
 	/**
