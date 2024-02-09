@@ -593,6 +593,15 @@ if ( ! class_exists( 'ChurchPlugins\Helpers' ) ) :
 				case 'accessible' :
 					$markup = '<span class="material-icons-outlined">accessible</span>';
 					break;
+				case 'facebook':
+				case 'instagram':
+				case 'linkedin':
+				case 'pinterest':
+				case 'twitter':
+				case 'vimeo':
+				case 'youtube':
+					$markup = '<span class="cp-icon">' . file_get_contents( CHURCHPLUGINS_DIR . 'assets/icons/' . $icon . '.svg' ) . '</span>';
+					break;
 			}
 
 			return apply_filters( 'cp_get_icon', $markup, $icon );
