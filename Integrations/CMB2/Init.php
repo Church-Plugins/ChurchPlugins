@@ -229,7 +229,7 @@ class Init {
 	 *
 	 * @param string $check Whether to perform default escaping.
 	 * @param mixed  $meta_value The value to be escaped.
-	 * @since 1.2.0
+	 * @since 1.0.22
 	 */
 	public function cp_social_links_escaped_value( $check, $meta_value ) {
 		if ( ! is_array( $meta_value ) ) {
@@ -249,7 +249,7 @@ class Init {
 	 *
 	 * @param mixed $check Whether or not to proceed with default sanitization.
 	 * @param mixed $meta_value The value to be sanitized.
-	 * @since 1.2.0
+	 * @since 1.0.22
 	 */
 	public function cp_social_links_sanitize( $check, $meta_value ) {
 		if ( ! is_array( $meta_value ) ) {
@@ -273,7 +273,7 @@ class Init {
 	 *
 	 * @param \CMB2_Field $field The field object.
 	 * @param mixed       $escaped_value Escaped value of the field.
-	 * @since 1.2.0
+	 * @since 1.0.22
 	 */
 	public function cp_social_links( $field, $escaped_value ) {
 		$this->setup_admin_scripts();
