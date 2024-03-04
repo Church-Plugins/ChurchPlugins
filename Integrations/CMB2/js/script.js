@@ -118,4 +118,64 @@
 			$(this).select2_sortable();
 		});
 	});
+
+
+	/**
+	 * Social Links
+	 */
+
+	/**
+	 * Delete a social link
+	 * @param {*} $link 
+	 */
+	const deleteSocialLink = ($link) => {
+		const $parent = $link.parent();
+
+		$link.remove();
+
+		// Re-index the remaining links
+		$parent.find('.cp-social-links--item').each(function (index) {
+			$(this).find('input, select').each(function () {
+				const name = $(this).attr('name');
+				
+				const newName = name.replace(/\[\d+\]/, `[${index}]`);
+
+				console.log(newName)
+
+				$(this).attr('name', newName)
+			})
+		})
+	}
+
+	/**
+	 * Initializes a social link
+	 * @param {*} $link 
+	 */
+	const setupSocialLink = ($link) => {
+		$link.find('.cp-social-links--remove').on('click', function(e) {
+			e.preventDefault();
+			deleteSocialLink($link);
+		})
+	}
+
+	// Social link fields
+	$('.cp-social-links').each(function () {
+		const $this = $(this);
+
+		$this.find('.cp-social-links--item').each(function () {
+			setupSocialLink($(this));
+		})
+
+		$this.find('.cp-social-links--add').on('click', function(e) {
+			e.preventDefault();
+
+			const itemCount = $this.find('.cp-social-links--item').length;
+
+			const $newLink = $($this.find('.cp-social-links--template').first().clone().html().replaceAll('[ID]', `[${itemCount}]`))
+			$newLink.find('input').val('');
+			$this.find('.cp-social-links--list').append($newLink);
+			setupSocialLink($newLink);
+		})
+	})
+	
 })(jQuery);
