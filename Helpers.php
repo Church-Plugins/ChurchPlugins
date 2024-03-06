@@ -1050,7 +1050,7 @@ if ( ! class_exists( 'ChurchPlugins\Helpers' ) ) :
 			if ( $is_style ) {
 				$url = $asset_url . $name . '.css';
 
-				wp_enqueue_style( $handle, $url, $assets['dependencies'], $version );
+				wp_enqueue_style( $handle, $url, $extra_deps, $version );
 
 				return array(
 					'handle'  => $handle,
