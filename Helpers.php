@@ -1016,13 +1016,14 @@ if ( ! class_exists( 'ChurchPlugins\Helpers' ) ) :
 		}
 
 		/**
-		 * Enqueue an asset with a version number.
+		 * Enqueue an asset bundled by wp-scripts.
 		 *
 		 * @param string $name The asset name.
 		 * @param array  $extra_deps Extra dependencies to add to the asset.
 		 * @param string $version The version number to use.
 		 * @param bool   $is_style Whether the asset is a stylesheet.
 		 * @param bool   $in_footer Whether the asset should be enqueued in the footer.
+		 * @return array The asset details.
 		 * @author Jonathan Roley
 		 * @since  1.0.22
 		 */
@@ -1047,9 +1048,30 @@ if ( ! class_exists( 'ChurchPlugins\Helpers' ) ) :
 			$handle = "$plugin_folder-$name";
 
 			if ( $is_style ) {
-				wp_enqueue_style( $handle, $asset_url . $name . '.css', $assets['dependencies'], $version );
+				$url = $asset_url . $name . '.css';
+
+				wp_enqueue_style( $handle, $url, $assets['dependencies'], $version );
+
+				return array(
+					'handle'  => $handle,
+					'url'     => $url,
+					'version' => $version,
+					'deps'    => $assets['dependencies'],
+					'type'    => 'style',
+				);
 			} else {
-				wp_enqueue_script( $handle, $asset_url . $name . '.js', array_merge( $assets['dependencies'], $extra_deps ), $version, $in_footer );
+				$full_deps = array_merge( $assets['dependencies'], $extra_deps );
+				$url       = $asset_url . $name . '.js';
+
+				wp_enqueue_script( $handle, $url, $full_deps, $version, $in_footer );
+				
+				return array(
+					'handle'  => $handle,
+					'url'     => $url,
+					'version' => $version,
+					'deps'    => $full_deps,
+					'type'    => 'script',
+				);
 			}
 		}
 
