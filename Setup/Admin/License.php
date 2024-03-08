@@ -34,12 +34,119 @@ class License {
 		$this->settings_url = $settings_url;
 
 		add_action( 'admin_init', array( $this, 'check_license' ) );
-		add_action( 'admin_init', array( $this, 'activate_license' ) );
-		add_action( 'admin_init', array( $this, 'deactivate_license' ) );
+
+		// add_action( 'admin_init', array( $this, 'activate_license' ) );
+		// add_action( 'admin_init', array( $this, 'deactivate_license' ) );
+
 		add_action( 'admin_init', array( $this, 'plugin_updater' ), 5 );
 
 		add_action( 'admin_notices', [ $this, 'admin_notices' ] );
 
+		add_action( 'rest_api_init', [ $this, 'register_rest_routes' ] );
+	}
+
+	/**
+	 * Register REST routes
+	 *
+	 * @return void
+	 */
+	public function register_rest_routes() {
+		register_rest_route(
+			'churchplugins/v1',
+			"/license/$this->id",
+			[
+				'methods'  => 'POST',
+				'callback' => [ $this, 'rest_activate_license' ],
+				'permission_callback' => function() {
+					return current_user_can( 'manage_options' );
+				},
+				'args' => [
+					'license' => [
+						'required' => true,
+						'type'     => 'string',
+					]
+				]
+			]
+		);
+
+		register_rest_route(
+			'churchplugins/v1',
+			"/license/$this->id",
+			[
+				'methods'  => 'DELETE',
+				'callback' => [ $this, 'rest_deactivate_license' ],
+				'permission_callback' => function() {
+					return current_user_can( 'manage_options' );
+				}
+			]
+		);
+
+		register_rest_route(
+			'churchplugins/v1',
+			"/license/$this->id/status",
+			[
+				'methods'  => 'GET',
+				'callback' => [ $this, 'rest_license_status' ],
+				'permission_callback' => function() {
+					return current_user_can( 'manage_options' );
+				}
+			]
+		);
+	}
+
+	/**
+	 * REST License Status
+	 *
+	 * @param \WP_REST_Request $request
+	 *
+	 * @return \WP_REST_Response
+	 */
+	public function rest_license_status() {
+		$license = $this->get( 'license' );
+
+		return new \WP_REST_Response( [ 'license' => $license, 'status' => $this->get( 'status' ) ], 200 );
+	}
+
+	/**
+	 * REST Activate License
+	 *
+	 * @param \WP_REST_Request $request
+	 *
+	 * @return \WP_REST_Response
+	 */
+	public function rest_activate_license( \WP_REST_Request $request ) {
+		$license = $request->get_param( 'license' );
+
+		try {
+			$this->activate_license( $license );
+			return new \WP_REST_Response( [
+				'success' => true,
+				'message' => __('License Activated', 'cp-connect' ),
+				'status'  => $this->get( 'status' ),
+			], 200 );
+		} catch ( \Exception $e ) {
+			return new \WP_REST_Response( [ 'success' => false, 'message' => $e->getMessage() ], 400 );
+		}
+	}
+
+	/**
+	 * REST Deactivate License
+	 *
+	 * @param \WP_REST_Request $request
+	 *
+	 * @return \WP_REST_Response
+	 */
+	public function rest_deactivate_license( \WP_REST_Request $request ) {
+		try {
+			$this->deactivate_license();
+			return new \WP_REST_Response( [
+				'success' => true,
+				'message' => __( 'License Deactivated', 'cp-connect' ),
+				'status'  => $this->get( 'status' ),
+			], 200 );
+		} catch ( \Exception $e ) {
+			return new \WP_REST_Response( [ 'success' => false, 'message' => $e->getMessage() ], 400 );
+		}
 	}
 
 	public function is_active() {
@@ -120,23 +227,10 @@ class License {
 	/**
 	 * Handle License activation
 	 *
+	 * @param string $license The license key.
 	 * @return void
 	 */
-	public function activate_license() {
-
-		// listen for our activate button to be clicked
-		if ( ! isset( $_POST[ $this->get_activate_slug() ], $_POST[ $this->get_nonce_slug() ] ) ) {
-			return;
-		}
-
-		// run a quick security check
-		if ( ! check_admin_referer( $this->get_nonce_slug(), $this->get_nonce_slug() ) ) {
-			return;
-		} // get out if we didn't click the Activate button
-
-		// retrieve the license from the database
-		$license = $this->get( 'license' );
-
+	public function activate_license( $license ) {
 		// data to send in our API request
 		$api_params = array(
 			'edd_action'  => 'activate_license',
@@ -155,18 +249,17 @@ class License {
 
 		// make sure the response came back okay
 		if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ) {
-
 			if ( is_wp_error( $response ) ) {
 				$message = $response->get_error_message();
 			} else {
 				$message = __( 'An error occurred, please try again.' );
 			}
-		} else {
 
+			throw new \Exception( $message );
+		} else {
 			$license_data = json_decode( wp_remote_retrieve_body( $response ) );
 
 			if ( false === $license_data->success ) {
-
 				switch ( $license_data->error ) {
 
 					case 'expired':
@@ -204,27 +297,12 @@ class License {
 						$message = __( 'An error occurred, please try again.', 'ChurchPlugins' );
 						break;
 				}
+
+				throw new \Exception( $message );
 			}
 
 			$this->update( 'status', $license_data->license );
 		}
-
-
-		// Check if anything passed on a message constituting a failure
-		if ( ! empty( $message ) ) {
-			$redirect = add_query_arg(
-				array(
-					'sl_activation' => 'false',
-					'message'       => rawurlencode( $message ),
-				),
-				$this->settings_url
-			);
-
-			wp_safe_redirect( $redirect );
-			exit();
-		}
-
-		delete_transient( $this->get_license_check_slug() );
 	}
 
 	/**
@@ -233,17 +311,6 @@ class License {
 	 * @return void
 	 */
 	public function deactivate_license() {
-
-		// listen for our activate button to be clicked
-		if ( ! isset( $_POST[$this->get_deactivate_slug()], $_POST[ $this->get_nonce_slug() ] ) ) {
-			return;
-		}
-
-		// run a quick security check
-		if ( ! check_admin_referer( $this->get_nonce_slug(), $this->get_nonce_slug() ) ) {
-			return;
-		}
-
 		// retrieve the license from the database
 		$license = $this->get( 'license' );
 
@@ -264,18 +331,16 @@ class License {
 
 		// make sure the response came back okay
 		if ( is_wp_error( $response ) ) {
-			return;
+			throw new \Exception( $response->get_error_message() );
 		}
 
 		// decode the license data
 		$license_data = json_decode( wp_remote_retrieve_body( $response ) );
 
 		// $license_data->license will be either "deactivated" or "failed"
-		if ( $license_data->license == 'deactivated' ) {
+		if ( $license_data->license === 'deactivated' ) {
 			$this->update( 'status', 'deactivated' );
-			delete_transient( $this->get_license_check_slug() );
 		}
-
 	}
 
 	/**
