@@ -24,24 +24,19 @@ class License {
 
 	/**
 	 * Class constructor
-	 *
 	 */
 	public function __construct( $id, $edd_id, $store_url, $plugin_file, $settings_url ) {
-		$this->id          = $id;
-		$this->edd_id      = $edd_id;
-		$this->store_url   = $store_url;
-		$this->plugin_file = $plugin_file;
+		$this->id           = $id;
+		$this->edd_id       = $edd_id;
+		$this->store_url    = $store_url;
+		$this->plugin_file  = $plugin_file;
 		$this->settings_url = $settings_url;
 
 		add_action( 'admin_init', array( $this, 'check_license' ) );
-
-		// add_action( 'admin_init', array( $this, 'activate_license' ) );
-		// add_action( 'admin_init', array( $this, 'deactivate_license' ) );
-
+		add_action( 'admin_init', array( $this, 'activate_license' ) );
+		add_action( 'admin_init', array( $this, 'deactivate_license' ) );
 		add_action( 'admin_init', array( $this, 'plugin_updater' ), 5 );
-
 		add_action( 'admin_notices', [ $this, 'admin_notices' ] );
-
 		add_action( 'rest_api_init', [ $this, 'register_rest_routes' ] );
 	}
 
@@ -64,8 +59,8 @@ class License {
 					'license' => [
 						'required' => true,
 						'type'     => 'string',
-					]
-				]
+					],
+				],
 			]
 		);
 
@@ -77,7 +72,7 @@ class License {
 				'callback' => [ $this, 'rest_deactivate_license' ],
 				'permission_callback' => function() {
 					return current_user_can( 'manage_options' );
-				}
+				},
 			]
 		);
 
@@ -89,7 +84,7 @@ class License {
 				'callback' => [ $this, 'rest_license_status' ],
 				'permission_callback' => function() {
 					return current_user_can( 'manage_options' );
-				}
+				},
 			]
 		);
 	}
@@ -97,21 +92,24 @@ class License {
 	/**
 	 * REST License Status
 	 *
-	 * @param \WP_REST_Request $request
-	 *
 	 * @return \WP_REST_Response
 	 */
 	public function rest_license_status() {
 		$license = $this->get( 'license' );
 
-		return new \WP_REST_Response( [ 'license' => $license, 'status' => $this->get( 'status' ) ], 200 );
+		return new \WP_REST_Response(
+			[
+				'license' => $license,
+				'status'  => $this->get( 'status' )
+			],
+			200
+		);
 	}
 
 	/**
 	 * REST Activate License
 	 *
-	 * @param \WP_REST_Request $request
-	 *
+	 * @param  \WP_REST_Request $request The REST request.
 	 * @return \WP_REST_Response
 	 */
 	public function rest_activate_license( \WP_REST_Request $request ) {
@@ -119,11 +117,14 @@ class License {
 
 		try {
 			$this->activate_license( $license );
-			return new \WP_REST_Response( [
-				'success' => true,
-				'message' => __('License Activated', 'cp-connect' ),
-				'status'  => $this->get( 'status' ),
-			], 200 );
+			return new \WP_REST_Response(
+				[
+					'success' => true,
+					'message' => __( 'License Activated', 'cp-connect' ),
+					'status'  => $this->get( 'status' ),
+				],
+				200
+			);
 		} catch ( \Exception $e ) {
 			return new \WP_REST_Response( [ 'success' => false, 'message' => $e->getMessage() ], 400 );
 		}
@@ -132,27 +133,44 @@ class License {
 	/**
 	 * REST Deactivate License
 	 *
-	 * @param \WP_REST_Request $request
-	 *
 	 * @return \WP_REST_Response
 	 */
-	public function rest_deactivate_license( \WP_REST_Request $request ) {
+	public function rest_deactivate_license() {
 		try {
 			$this->deactivate_license();
-			return new \WP_REST_Response( [
-				'success' => true,
-				'message' => __( 'License Deactivated', 'cp-connect' ),
-				'status'  => $this->get( 'status' ),
-			], 200 );
+			return new \WP_REST_Response(
+				[
+					'success' => true,
+					'message' => __( 'License Deactivated', 'cp-connect' ),
+					'status'  => $this->get( 'status' ),
+				],
+				200
+			);
 		} catch ( \Exception $e ) {
-			return new \WP_REST_Response( [ 'success' => false, 'message' => $e->getMessage() ], 400 );
+			return new \WP_REST_Response(
+				[
+					'success' => false,
+					'message' => $e->getMessage(),
+				],
+				400
+			);
 		}
 	}
 
+	/**
+	 * Checks if the license is active.
+	 */
 	public function is_active() {
 		return 'valid' == $this->get( 'status' );
 	}
 
+	/**
+	 * Get a license option.
+	 *
+	 * @param string $key The option key.
+	 * @param string $default The default value.
+	 * @return string
+	 */
 	public function get( $key = false, $default = '' ) {
 		$data = get_option( $this->id, [] );
 
@@ -163,6 +181,13 @@ class License {
 		return trim( $data[ $key ] ?? $default );
 	}
 
+	/**
+	 * Update a license option.
+	 *
+	 * @param string $key The option key.
+	 * @param string $value The option value.
+	 * @return void
+	 */
 	public function update( $key, $value ) {
 		$data = $this->get();
 
@@ -229,8 +254,10 @@ class License {
 	 *
 	 * @param string $license The license key.
 	 * @return void
+	 * @throws \Exception If an error occurs.
+	 * @since 1.0.23
 	 */
-	public function activate_license( $license ) {
+	public function maybe_activate_license( $license ) {
 		// data to send in our API request
 		$api_params = array(
 			'edd_action'  => 'activate_license',
@@ -241,11 +268,14 @@ class License {
 		);
 
 		// Call the custom API.
-		$response = wp_remote_post( $this->store_url, array(
-			'timeout'   => 15,
-			'sslverify' => false,
-			'body'      => $api_params
-		) );
+		$response = wp_remote_post(
+			$this->store_url,
+			array(
+				'timeout'   => 15,
+				'sslverify' => false,
+				'body'      => $api_params,
+			)
+		);
 
 		// make sure the response came back okay
 		if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ) {
@@ -308,9 +338,11 @@ class License {
 	/**
 	 * Handle License deactivation
 	 *
-	 * @return void
+	 * @return object The api response.
+	 * @throws \Exception If an error occurs.
+	 * @since 1.0.23
 	 */
-	public function deactivate_license() {
+	public function maybe_deactivate_license() {
 		// retrieve the license from the database
 		$license = $this->get( 'license' );
 
@@ -318,16 +350,19 @@ class License {
 		$api_params = array(
 			'edd_action' => 'deactivate_license',
 			'license'    => $license,
-			'item_id'    => urlencode( $this->edd_id ), // the name of our product in EDD
-			'url'        => home_url()
+			'item_id'    => rawurlencode( $this->edd_id ), // the name of our product in EDD
+			'url'        => home_url(),
 		);
 
 		// Call the custom API.
-		$response = wp_remote_post( $this->store_url, array(
-			'timeout'   => 15,
-			'sslverify' => false,
-			'body'      => $api_params
-		) );
+		$response = wp_remote_post(
+			$this->store_url,
+			array(
+				'timeout'   => 15,
+				'sslverify' => false,
+				'body'      => $api_params,
+			)
+		);
 
 		// make sure the response came back okay
 		if ( is_wp_error( $response ) ) {
@@ -338,8 +373,81 @@ class License {
 		$license_data = json_decode( wp_remote_retrieve_body( $response ) );
 
 		// $license_data->license will be either "deactivated" or "failed"
-		if ( $license_data->license === 'deactivated' ) {
+		if ( 'deactivated' === $license_data->license ) {
 			$this->update( 'status', 'deactivated' );
+		}
+
+		return $license_data;
+	}
+
+	/**
+	 * Handle License activation
+	 *
+	 * @return void
+	 */
+	public function activate_license() {
+
+		// listen for our activate button to be clicked
+		if ( ! isset( $_POST[ $this->get_activate_slug() ], $_POST[ $this->get_nonce_slug() ] ) ) {
+			return;
+		}
+
+		// run a quick security check
+		if ( ! check_admin_referer( $this->get_nonce_slug(), $this->get_nonce_slug() ) ) {
+			return;
+		} // get out if we didn't click the Activate button
+
+		// retrieve the license from the database
+		$license = $this->get( 'license' );
+
+		try {
+			$this->maybe_activate_license( $license );
+		} catch ( \Exception $e ) {
+			$message = $e->getMessage();
+		}
+
+		// Check if anything passed on a message constituting a failure
+		if ( ! empty( $message ) ) {
+			$redirect = add_query_arg(
+				array(
+					'sl_activation' => 'false',
+					'message'       => rawurlencode( $message ),
+				),
+				$this->settings_url
+			);
+
+			wp_safe_redirect( $redirect );
+			exit();
+		}
+
+		delete_transient( $this->get_license_check_slug() );
+	}
+
+	/**
+	 * Handle License deactivation
+	 *
+	 * @return void
+	 */
+	public function deactivate_license() {
+
+		// listen for our activate button to be clicked
+		if ( ! isset( $_POST[ $this->get_deactivate_slug() ], $_POST[ $this->get_nonce_slug() ] ) ) {
+			return;
+		}
+
+		// run a quick security check
+		if ( ! check_admin_referer( $this->get_nonce_slug(), $this->get_nonce_slug() ) ) {
+			return;
+		}
+
+		try {
+			$result = $this->maybe_deactivate_license();
+				// $license_data->license will be either "deactivated" or "failed"
+			if ( 'deactivated' === $result->license ) {
+				delete_transient( $this->get_license_check_slug() );
+			}
+		} catch ( \Exception $e ) {
+			return;
 		}
 	}
 
