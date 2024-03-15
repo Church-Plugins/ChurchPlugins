@@ -225,6 +225,23 @@ class Init {
 	}
 
 	/**
+	 * Get supported social networks
+	 *
+	 * @return array
+	 */
+	public function cp_social_links_supported_networks() {
+		return array(
+			'facebook'  => __( 'Facebook', 'cp-staff' ),
+			'instagram' => __( 'Instagram', 'cp-staff' ),
+			'linkedin'  => __( 'LinkedIn', 'cp-staff' ),
+			'pinterest' => __( 'Pinterest', 'cp-staff' ),
+			'twitter'   => __( 'Twitter (X)', 'cp-staff' ),
+			'vimeo'     => __( 'Vimeo', 'cp-staff' ),
+			'youtube'   => __( 'YouTube', 'cp-staff' ),
+		);
+	}
+
+	/**
 	 * Handle escaping for cp_social_links field
 	 *
 	 * @param string $check Whether to perform default escaping.
@@ -278,15 +295,7 @@ class Init {
 	public function cp_social_links( $field, $escaped_value ) {
 		$this->setup_admin_scripts();
 
-		$supported_networks = array(
-			'facebook'  => __( 'Facebook', 'cp-staff' ),
-			'instagram' => __( 'Instagram', 'cp-staff' ),
-			'linkedin'  => __( 'LinkedIn', 'cp-staff' ),
-			'pinterest' => __( 'Pinterest', 'cp-staff' ),
-			'twitter'   => __( 'Twitter (X)', 'cp-staff' ),
-			'vimeo'     => __( 'Vimeo', 'cp-staff' ),
-			'youtube'   => __( 'YouTube', 'cp-staff' ),
-		);
+		$supported_networks = $this->cp_social_links_supported_networks();
 
 		$field_id   = $field->args['id'];
 		$links      = is_array( $escaped_value ) ? $escaped_value : array();
