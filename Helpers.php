@@ -995,6 +995,86 @@ if ( ! class_exists( 'ChurchPlugins\Helpers' ) ) :
 			return $output;
 		}
 
+		/**
+		 * Gets the path to the current plugin directory.
+		 *
+		 * @since 1.0.22
+		 * @return string
+		 */
+		public static function get_plugin_dir() {
+			return trailingslashit( dirname( __FILE__, 3 ) );
+		}
+
+		/**
+		 * Gets the URL to the current plugin.
+		 *
+		 * @since 1.0.22
+		 * @return string
+		 */
+		public static function get_plugin_url() {
+			return trailingslashit( dirname( plugins_url( '', __FILE__ ), 2 ) );
+		}
+
+		/**
+		 * Enqueue an asset bundled by wp-scripts.
+		 *
+		 * @param string $name The asset name.
+		 * @param array  $extra_deps Extra dependencies to add to the asset.
+		 * @param string $version The version number to use.
+		 * @param bool   $is_style Whether the asset is a stylesheet.
+		 * @param bool   $in_footer Whether the asset should be enqueued in the footer.
+		 * @return array The asset details.
+		 * @author Jonathan Roley
+		 * @since  1.0.22
+		 */
+		public static function enqueue_asset( $name, $extra_deps = array(), $version = null, $is_style = false, $in_footer = false ) {
+			$asset_dir  = self::get_plugin_dir() . 'build/';
+			$asset_url  = self::get_plugin_url() . 'build/';
+			$asset_file = $asset_dir . $name . '.asset.php';
+
+			if ( ! file_exists( $asset_file ) ) {
+				return;
+			}
+
+			$path_sections = array_filter( explode( '/', self::get_plugin_dir() ) );
+			$plugin_folder = array_pop( $path_sections );
+
+			$assets = include( $asset_file );
+
+			if ( ! $version ) {
+				$version = $assets['version'];
+			}
+
+			$handle = "$plugin_folder-$name";
+
+			if ( $is_style ) {
+				$url = $asset_url . $name . '.css';
+
+				wp_enqueue_style( $handle, $url, $extra_deps, $version );
+
+				return array(
+					'handle'  => $handle,
+					'url'     => $url,
+					'version' => $version,
+					'deps'    => $assets['dependencies'],
+					'type'    => 'style',
+				);
+			} else {
+				$full_deps = array_merge( $assets['dependencies'], $extra_deps );
+				$url       = $asset_url . $name . '.js';
+
+				wp_enqueue_script( $handle, $url, $full_deps, $version, $in_footer );
+				
+				return array(
+					'handle'  => $handle,
+					'url'     => $url,
+					'version' => $version,
+					'deps'    => $full_deps,
+					'type'    => 'script',
+				);
+			}
+		}
+
 	}
 
 endif; // Class exists check
