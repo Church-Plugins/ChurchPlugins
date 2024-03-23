@@ -178,6 +178,24 @@ abstract class Templates {
 			return $template;
 		}
 
+		if ( str_ends_with( $template, '/wp-includes/template-canvas.php' ) ) {
+			$name = is_archive() ? 'archive-' : 'single-';
+			$name .= get_post_type() ? get_post_type() : 'post';
+
+			// find an existing FSE template
+			$template_posts = get_posts(
+				[
+					'post_type' => 'wp_template',
+					'name'      => $name,
+				]
+			);
+
+			// don't use our custom template of one exists
+			if ( ! empty( $template_posts ) ) {
+				return $template;
+			}
+		}
+
 		// if it's a single 404
 		if ( is_single() && is_404() ) {
 			return get_404_template();

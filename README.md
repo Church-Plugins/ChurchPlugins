@@ -6,6 +6,10 @@ Common utility and helper functions.
 **License:**           GPLv2 or later
 **License URI:**       [http://www.gnu.org/licenses/gpl-2.0.html](http://www.gnu.org/licenses/gpl-2.0.html)
 
+### 1.0.22 - 2/28/2024
+* Add support for FSE templates
+* Add new CMB2 field for specifying social links.
+
 ### 1.0.21 - 2/6/2024
 * Change default table prefix to use  prefix instead of base_prefix
 
