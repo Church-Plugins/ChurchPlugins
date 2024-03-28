@@ -120,7 +120,7 @@ class License {
 			return new \WP_REST_Response(
 				[
 					'success' => true,
-					'message' => __( 'License Activated', 'cp-connect' ),
+					'message' => __( 'License Activated', 'churchplugins' ),
 					'status'  => $this->get( 'status' ),
 				],
 				200
@@ -141,7 +141,7 @@ class License {
 			return new \WP_REST_Response(
 				[
 					'success' => true,
-					'message' => __( 'License Deactivated', 'cp-connect' ),
+					'message' => __( 'License Deactivated', 'churchplugins' ),
 					'status'  => $this->get( 'status' ),
 				],
 				200
