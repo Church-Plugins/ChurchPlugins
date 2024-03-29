@@ -1008,7 +1008,7 @@ if ( ! class_exists( 'ChurchPlugins\Helpers' ) ) :
 		 * @author Tanner Moushey, 3/28/24
 		 */
 		public static function set_plugin_dir( $dir ) {
-			self::$plugin_dir = $dir;
+			self::$_plugin_dir = $dir;
 		}
 
 		/**
@@ -1018,7 +1018,7 @@ if ( ! class_exists( 'ChurchPlugins\Helpers' ) ) :
 		 * @return string
 		 */
 		public static function get_plugin_dir() {
-			$plugin_dir = self::$plugin_dir;
+			$plugin_dir = self::$_plugin_dir;
 
 			if ( empty( $plugin_dir ) ) {
 				$plugin_dir = trailingslashit( dirname( __FILE__, 3 ) );
@@ -1037,7 +1037,7 @@ if ( ! class_exists( 'ChurchPlugins\Helpers' ) ) :
 		 * @author Tanner Moushey, 3/28/24
 		 */
 		public static function set_plugin_url( $url ) {
-			self::$plugin_url = $url;
+			self::$_plugin_url = $url;
 		}
 
 		/**
@@ -1047,7 +1047,7 @@ if ( ! class_exists( 'ChurchPlugins\Helpers' ) ) :
 		 * @return string
 		 */
 		public static function get_plugin_url() {
-			$plugin_url = self::$plugin_url;
+			$plugin_url = self::$_plugin_url;
 
 			if ( empty( $plugin_url ) ) {
 				$plugin_url = trailingslashit( dirname( plugins_url( '', __FILE__ ), 2 ) );
