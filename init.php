@@ -1,6 +1,6 @@
 <?php
 
-if ( ! class_exists( 'ChurchPlugins_1_0_24', false ) ) {
+if ( ! class_exists( 'ChurchPlugins_1_1_0', false ) ) {
 
 	/**
 	 * Handles checking for and loading the newest version of ChurchPlugins
@@ -11,7 +11,7 @@ if ( ! class_exists( 'ChurchPlugins_1_0_24', false ) ) {
 	 * @package   ChurchPlugins
 	 * @license   GPL-2.0+
 	 */
-	class ChurchPlugins_1_0_24 {
+	class ChurchPlugins_1_1_0 {
 
 		/**
 		 * Current version number
@@ -19,7 +19,7 @@ if ( ! class_exists( 'ChurchPlugins_1_0_24', false ) ) {
 		 * @var   string
 		 * @since 1.0.0
 		 */
-		const VERSION = '1.0.24';
+		const VERSION = '1.1.0';
 
 		/**
 		 * Current version hook priority.
@@ -28,12 +28,12 @@ if ( ! class_exists( 'ChurchPlugins_1_0_24', false ) ) {
 		 * @var   int
 		 * @since 1.0.0
 		 */
-		const PRIORITY = 9976;
+		const PRIORITY = 9975;
 
 		/**
 		 * Single instance of the ChurchPlugins object
 		 *
-		 * @var ChurchPlugins_1_0_24
+		 * @var ChurchPlugins_1_1_0
 		 */
 		public static $single_instance = null;
 
@@ -51,7 +51,7 @@ if ( ! class_exists( 'ChurchPlugins_1_0_24', false ) ) {
 		 * Creates/returns the single instance ChurchPlugins object
 		 *
 		 * @since  1.0.0
-		 * @return ChurchPlugins_1_0_24 Single instance object
+		 * @return ChurchPlugins_1_1_0 Single instance object
 		 */
 		public static function initiate() {
 			if ( null === self::$single_instance ) {
@@ -101,6 +101,7 @@ if ( ! class_exists( 'ChurchPlugins_1_0_24', false ) ) {
 			require_once( CHURCHPLUGINS_DIR . 'CMB2/includes/CMB2_Utils.php' );
 			require_once( CHURCHPLUGINS_DIR . 'Integrations/CMB2/Init.php' );
 			require_once( CHURCHPLUGINS_DIR . 'Helpers.php' );
+			require_once( CHURCHPLUGINS_DIR . 'Logging.php' );
 			require_once( CHURCHPLUGINS_DIR . 'Templates.php' );
 			require_once( CHURCHPLUGINS_DIR . 'functions.php' );
 
@@ -154,6 +155,6 @@ if ( ! class_exists( 'ChurchPlugins_1_0_24', false ) ) {
 
 	}
 
-	return ChurchPlugins_1_0_24::initiate();
+	return ChurchPlugins_1_1_0::initiate();
 
 }// End if().
