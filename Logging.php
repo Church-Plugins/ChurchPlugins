@@ -20,9 +20,8 @@ defined( 'ABSPATH' ) || exit;
  * A general use class for logging events and errors.
  *
  * @since 1.1.0
- * @since 3.0 - Updated to work with the new tables and classes as part of the migration to custom tables.
  */
-abstract class Logging {
+class Logging {
 
 	/**
 	 * Whether the debug log file is writable or not.
@@ -45,20 +44,45 @@ abstract class Logging {
 	 */
 	private $file = '';
 
+	/**
+	 * ID of the plugin or theme.
+	 *
+	 * @var string
+	 * @since 1.1.0
+	 */
 	public $id = '';
+
+	/**
+	 * Whether or not to log debug messages.
+	 *
+	 * @var bool
+	 * @since 1.1.0
+	 */
+	public $is_debug_mode = false;
 
 	/**
 	 * Set up the Logging Class
 	 *
 	 * @since 1.1.0
 	 */
-	public function __construct( $id = 'churchplugins' ) {
+	public function __construct( $id = 'churchplugins', $is_debug_mode = false ) {
 		$this->id = $id;
+		$this->is_debug_mode = $is_debug_mode;
 
-		add_action( 'plugins_loaded', array( $this, 'setup_log_file' ), 8 );
+		$this->setup_log_file();
 	}
 
-	public abstract function is_debug_mode();
+	/**
+	 * Get debug mode
+	 *
+	 * @return mixed|null
+	 * @since  1.1.0
+	 *
+	 * @author Tanner Moushey, 6/9/24
+	 */
+	public function is_debug_mode(){
+		return apply_filters( $this->id . '_is_debug_mode', boolval( $this->is_debug_mode ) );
+	}
 
 	/** File System ***********************************************************/
 
@@ -265,7 +289,7 @@ abstract class Logging {
 
 		}
 
-		self::log( $message );
+		$this->log( $message );
 	}
 
 }
