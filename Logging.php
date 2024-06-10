@@ -147,7 +147,7 @@ class Logging {
 	 * @param string $message Message to insert in the log.
 	 */
 	public function log_to_file( $message = '' ) {
-		$message = date( 'Y-n-d H:i:s' ) . ' - ' . $message . "\r\n";
+		$message = current_time( 'mysql' ) . ' - ' . $message . "\r\n";
 		$this->write_to_log( $message );
 	}
 
