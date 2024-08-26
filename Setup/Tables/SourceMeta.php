@@ -54,7 +54,7 @@ class SourceMeta extends Table  {
 	 */
 	public function update_enum_sql() {
 		$keys = "'" . implode( "', '", self::get_keys() ) . "'";
-		return "ALTER TABLE " . $this->table_name . " MODIFY COLUMN key ENUM( $keys );";
+		return "ALTER TABLE " . $this->table_name . " MODIFY COLUMN `key` ENUM( $keys );";
 	}
 
 	/**
