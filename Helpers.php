@@ -1069,8 +1069,8 @@ if ( ! class_exists( 'ChurchPlugins\Helpers' ) ) :
 		 * @since  1.0.22
 		 */
 		public static function enqueue_asset( $name, $extra_deps = array(), $version = null, $is_style = false, $in_footer = false ) {
-			$asset_dir  = self::get_plugin_dir() . 'build/';
-			$asset_url  = self::get_plugin_url() . 'build/';
+			$asset_dir  = self::get_plugin_dir() . 'build/src/';
+			$asset_url  = self::get_plugin_url() . 'build/src/';
 			$asset_file = $asset_dir . $name . '.asset.php';
 
 			if ( ! file_exists( $asset_file ) ) {

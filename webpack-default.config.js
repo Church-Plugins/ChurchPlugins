@@ -25,10 +25,14 @@ const getDynamicEntryPoints = ( basePath = '' ) => {
 		const handle =
 			'src' === folderName ? folder : `${ folderName }-${ folder }`;
 
-		// look for index.js, fallback to index.scss
-		if ( fs.existsSync( `${ folderPath }/index.js` ) ) {
-			entryPoints[ handle ] = `${ folderPath }/index.js`;
-		} else if ( fs.existsSync( `${ folderPath }/index.scss` ) ) {
+		// check for js and jsx files
+		const jsFiles = fs.readdirSync( folderPath ).filter( ( file ) =>
+			/^index.jsx?$/.test( file )
+		);
+
+		if ( jsFiles.length ) {
+			entryPoints[ handle ] = `${ folderPath }/${ jsFiles[ 0 ] }`;
+		} else if ( fs.readdirSync( folderPath ).includes( 'index.scss' ) ) { // scss
 			entryPoints[ handle ] = `${ folderPath }/index.scss`;
 		}
 	} );
@@ -36,10 +40,30 @@ const getDynamicEntryPoints = ( basePath = '' ) => {
 	return entryPoints;
 };
 
-module.exports = {
+
+const config = {
 	...defaultConfig,
 	entry: {
 		...getDynamicEntryPoints(),
 		...getDynamicEntryPoints( 'admin' ),
 	},
+	output: {
+		filename: '[name].js',
+		path: path.resolve( process.cwd(), 'build/src' ),
+	},
 };
+
+if(defaultConfig.devServer) {
+	config.devServer = {
+		...defaultConfig.devServer,
+		proxy: {
+			'/build/src': {
+				...defaultConfig.devServer.proxy['/build'],
+			}
+		}
+	};
+}
+
+console.log(config)
+
+module.exports = config;
