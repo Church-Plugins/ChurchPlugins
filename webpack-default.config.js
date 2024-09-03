@@ -5,29 +5,38 @@ const { sync: readPkgUp } = require( 'read-pkg-up' );
 
 const { path: pkgPath } = readPkgUp();
 
-const srcDir = path.resolve( path.dirname( pkgPath ), 'src' );
+const baseDir = path.dirname( pkgPath )
 
-const getDynamicEntryPoints = ( basePath = '' ) => {
+/**
+ * Gets dynamic entry points for the given base path.
+ *
+ * @param {string} basePath 
+ * @param {object} config
+ * @param {string|string[]} [config.excludePaths]
+ * @returns 
+ */
+const getDynamicEntryPoints = ( basePath = '', config = {} ) => {
 	const entryPoints = {};
 
-	const filePath = path.resolve( srcDir, basePath );
-	const folders = fs.readdirSync( filePath );
+	const filePath   = path.resolve( baseDir, basePath );
+	const folders    = fs.readdirSync( filePath );
 	const folderName = path.basename( filePath );
+
+	const excludePaths = config.excludePaths ? [].concat( config.excludePaths ) : [];
 
 	folders.forEach( ( folder ) => {
 		const folderPath = path.resolve( filePath, folder );
 
 		if ( ! fs.lstatSync( folderPath ).isDirectory() ) return;
 
-		// ignore admin folder, it's handled separately
-		if ( 'admin' === folder ) return;
+		if ( excludePaths.includes(folder) ) return;
 
 		const handle =
 			'src' === folderName ? folder : `${ folderName }-${ folder }`;
 
-		// check for js and jsx files
+		// check for js/ts and jsx files
 		const jsFiles = fs.readdirSync( folderPath ).filter( ( file ) =>
-			/^index.jsx?$/.test( file )
+			/^index.[jt]sx?$/.test( file )
 		);
 
 		if ( jsFiles.length ) {
@@ -44,8 +53,8 @@ const getDynamicEntryPoints = ( basePath = '' ) => {
 const config = {
 	...defaultConfig,
 	entry: {
-		...getDynamicEntryPoints(),
-		...getDynamicEntryPoints( 'admin' ),
+		...getDynamicEntryPoints( 'src', { excludePaths: [ 'admin' ] } ),
+		...getDynamicEntryPoints( 'src/admin' ),
 	},
 	output: {
 		filename: '[name].js',
