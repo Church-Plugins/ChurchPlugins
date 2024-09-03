@@ -6,6 +6,12 @@ Common utility and helper functions.
 **License:**           GPLv2 or later
 **License URI:**       [http://www.gnu.org/licenses/gpl-2.0.html](http://www.gnu.org/licenses/gpl-2.0.html)
 
+### 1.1.1 - 09/03/2024
+* Add a base class for a plugin initialization class to give core access to plugin-contextual information
+
+### 1.1.0 - 06/09/2024
+* Add a base class for logging information
+
 ### 1.0.22 - 2/28/2024
 * Add support for FSE templates
 * Add new CMB2 field for specifying social links.

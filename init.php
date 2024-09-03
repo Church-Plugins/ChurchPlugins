@@ -1,6 +1,6 @@
 <?php
 
-if ( ! class_exists( 'ChurchPlugins_1_1_0', false ) ) {
+if ( ! class_exists( 'ChurchPlugins_1_1_1', false ) ) {
 
 	/**
 	 * Handles checking for and loading the newest version of ChurchPlugins
@@ -11,7 +11,15 @@ if ( ! class_exists( 'ChurchPlugins_1_1_0', false ) ) {
 	 * @package   ChurchPlugins
 	 * @license   GPL-2.0+
 	 */
-	class ChurchPlugins_1_1_0 {
+	class ChurchPlugins_1_1_1 {
+
+		/**
+		 * Registered plugins
+		 *
+		 * @since 1.1.1
+		 * @var \ChurchPlugins\Setup\Plugin[]
+		 */
+		public $registered_plugins = [];
 
 		/**
 		 * Current version number
@@ -19,7 +27,7 @@ if ( ! class_exists( 'ChurchPlugins_1_1_0', false ) ) {
 		 * @var   string
 		 * @since 1.0.0
 		 */
-		const VERSION = '1.1.0';
+		const VERSION = '1.1.1';
 
 		/**
 		 * Current version hook priority.
@@ -28,12 +36,12 @@ if ( ! class_exists( 'ChurchPlugins_1_1_0', false ) ) {
 		 * @var   int
 		 * @since 1.0.0
 		 */
-		const PRIORITY = 9975;
+		const PRIORITY = 9974;
 
 		/**
 		 * Single instance of the ChurchPlugins object
 		 *
-		 * @var ChurchPlugins_1_1_0
+		 * @var ChurchPlugins_1_1_1
 		 */
 		public static $single_instance = null;
 
@@ -51,7 +59,7 @@ if ( ! class_exists( 'ChurchPlugins_1_1_0', false ) ) {
 		 * Creates/returns the single instance ChurchPlugins object
 		 *
 		 * @since  1.0.0
-		 * @return ChurchPlugins_1_1_0 Single instance object
+		 * @return ChurchPlugins_1_1_1 Single instance object
 		 */
 		public static function initiate() {
 			if ( null === self::$single_instance ) {
@@ -153,8 +161,18 @@ if ( ! class_exists( 'ChurchPlugins_1_1_0', false ) ) {
 
 		}
 
+		/**
+		 * Register a plugin.
+		 *
+		 * @param ChurchPlugins\Setup\Plugin $plugin
+		 * @since 1.1.1
+		 * @return void
+		 */
+		public function register_plugin( $plugin ) {
+			$this->registered_plugins[ basename( $plugin->get_plugin_dir() ) ] = $plugin;
+		}
 	}
 
-	return ChurchPlugins_1_1_0::initiate();
+	return ChurchPlugins_1_1_1::initiate();
 
 }// End if().
