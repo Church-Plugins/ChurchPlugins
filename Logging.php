@@ -70,6 +70,24 @@ class Logging {
 		$this->is_debug_mode = $is_debug_mode;
 
 		$this->setup_log_file();
+
+		add_action( 'admin_init', array( $this, 'clear_log_cb' ) );
+	}
+
+	public function clear_log_cb() {
+		if ( empty( $_POST['clear-log'] ) ) {
+			return;
+		}
+
+		if ( empty( $_POST['log-id'] ) || $_POST['log-id'] !== $this->id ) {
+			return;
+		}
+
+		if ( empty( $_POST['clear-log-nonce'] ) || ! wp_verify_nonce( $_POST['clear-log-nonce'], 'clear-log' ) ) {
+			return;
+		}
+
+		$this->clear_log_file();
 	}
 
 	/**
@@ -191,7 +209,7 @@ class Logging {
 			}
 
 			$file = $this->get_fs()->get_contents( $this->file );
-		} else {
+		} else if ( $this->file ) {
 			$this->get_fs()->put_contents( $this->file, '' );
 			$this->get_fs()->chmod( $this->file, 0664 );
 		}
