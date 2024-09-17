@@ -8,6 +8,9 @@
 
 namespace ChurchPlugins\Setup;
 
+// Exit if accessed directly
+defined( 'ABSPATH' ) || exit;
+
 /**
  * Plugin Class
  *
@@ -25,6 +28,14 @@ abstract class Plugin {
 	 * @var Customizer\_Init
 	 */
 	public $customizer;
+
+	/**
+	 * A plugin-contextual logger
+	 *
+	 * @var \ChurchPlugins\Logging
+	 * @since 1.1.3
+	 */
+	public $logging;
 
 	/**
 	 * Only make one instance of Plugin
@@ -58,16 +69,14 @@ abstract class Plugin {
 	}
 
 	/**
-	 * Plugin setup entry hub
-	 *
-	 * @return void
+	 * Include other APIs
 	 */
-	protected function includes() {}
+	protected function includes() {
+		$this->logging = new \ChurchPlugins\Logging( $this->get_id(), $this->is_debug_mode() );
+	}
 
 	/**
-	 * Plugin setup entry hub
-	 *
-	 * @return void
+	 * Register hooks
 	 */
 	protected function actions() {}
 
@@ -86,6 +95,17 @@ abstract class Plugin {
 	abstract public function get_plugin_url();
 
 	/**
+	 * Get plugin ID. This can be implemented by the plugins, but returns the plugin directory name by default.
+	 *
+	 * @return string
+	 * @since 1.1.3
+	 */
+	public function get_id() {
+		$path_sections = array_filter( explode( '/', $this->get_plugin_dir() ) );
+		return array_pop( $path_sections );
+	}
+
+	/**
 	 * Enqueue an asset bundled by wp-scripts.
 	 *
 	 * @param string $name The asset name.
@@ -98,8 +118,8 @@ abstract class Plugin {
 	 * @since  1.0.22
 	 */
 	public function enqueue_asset( $name, $extra_deps = array(), $version = null, $is_style = false, $in_footer = false ) {
-		$asset_dir  = $this->get_plugin_dir() . 'build/src/';
-		$asset_url  = $this->get_plugin_url() . 'build/src/';
+		$asset_dir  = trailingslashit( $this->get_plugin_dir() ) . 'build/src/';
+		$asset_url  = trailingslashit( $this->get_plugin_url() ) . 'build/src/';
 		$asset_file = $asset_dir . $name . '.asset.php';
 
 		if ( ! file_exists( $asset_file ) ) {
@@ -143,5 +163,14 @@ abstract class Plugin {
 				'type'    => 'script',
 			);
 		}
+	}
+
+	/**
+	 * Whether the plugin is in debug mode
+	 *
+	 * @return bool
+	 */
+	public function is_debug_mode() {
+		return defined( 'WP_DEBUG' ) && WP_DEBUG;
 	}
 }

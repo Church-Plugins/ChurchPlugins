@@ -2,7 +2,6 @@
 
 namespace ChurchPlugins\Setup;
 
-use ChurchPlugins;
 use ChurchPlugins\Setup\Tables\Log;
 use ChurchPlugins\Setup\Tables\Source;
 use ChurchPlugins\Setup\Tables\SourceMeta;
