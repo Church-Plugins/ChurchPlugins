@@ -1,12 +1,16 @@
 @import 'mixins/_breakpoints.scss';
 
 .cp-pg-template {
-	max-width: 100%;
+	max-width: 90vw;
 	width: var( --cp-content-width );
 	margin: var(--cp-gap--md) auto;
-	padding-top: var(--cp-gap--lg);
 	padding-bottom: var(--cp-gap--lg);
 	flex-grow: 1;
+	box-sizing: border-box;
+
+	* {
+		box-sizing: border-box;
+	}
 
 	@include media-breakpoint-down(md) {
 		max-width: calc(100vw - var(--cp-content-padding));
