@@ -67,11 +67,32 @@ abstract class Templates {
 		wp_cache_set( $this->spoofed_post()->ID, $this->spoofed_post(), 'posts' );
 		wp_cache_set( $this->spoofed_post()->ID, [ true ], 'post_meta' );
 
-		add_action( 'wp_head', [ $this, 'wpHeadFinished' ], 999 );
+		add_action( 'wp_head', __CLASS__ . '::wpHeadFinished', 999 );
 
 		// add the theme name to the body class when needed
 		if ( $this->needs_compatibility_fix() ) {
-			add_filter( 'body_class', [ $this, 'theme_body_class' ] );
+			add_filter( 'body_class', __CLASS__ . '::theme_body_class' );
+		}
+
+		add_action( 'cp_do_header', __CLASS__ . '::do_header' );
+		add_action( 'cp_do_footer', __CLASS__ . '::do_footer' );
+
+
+	}
+
+	public static function do_header() {
+		if ( function_exists( 'wp_is_block_theme' ) && wp_is_block_theme() ) {
+			echo apply_filters( 'cp_template_block_header','<!-- wp:template-part {"slug":"header","area":"header","tagName":"header"} /-->' );;
+		} else {
+			get_header();
+		}
+	}
+
+	public static function do_footer() {
+		if ( function_exists( 'wp_is_block_theme' ) && wp_is_block_theme() ) {
+			echo apply_filters( 'cp_template_block_footer','<!-- wp:template-part {"slug":"footer","area":"footer","tagName":"footer"} /-->' );
+		} else {
+			get_footer();
 		}
 	}
 
@@ -172,6 +193,9 @@ abstract class Templates {
 	 * @return string Path to template
 	 */
 	public function template_include( $template ) {
+		global $_wp_current_template_content;
+
+		$original_template = $template;
 		do_action( 'cp_template_chooser', $template, $this );
 
 		if ( ! $this->is_cp_query() ) {
@@ -227,7 +251,20 @@ abstract class Templates {
 
 		self::$template = $template;
 
-		return $template;
+		self::$template = $template;
+
+		if ( function_exists( 'wp_is_block_theme' ) && wp_is_block_theme() ) {
+
+			ob_start(); // Start output buffering
+			include( $template ); // Load the original template
+			$content = ob_get_clean(); // Capture the template content and stop buffering
+
+			$_wp_current_template_content = $content;
+
+			return $original_template;
+		} else {
+			return $template;
+		}
 	}
 
 	/**
@@ -257,7 +294,7 @@ abstract class Templates {
 	 *
 	 * @return array $classes
 	 **/
-	public function theme_body_class( $classes ) {
+	public static function theme_body_class( $classes ) {
 		$child_theme  = get_option( 'stylesheet' );
 		$parent_theme = get_option( 'template' );
 
@@ -300,7 +337,7 @@ abstract class Templates {
 	/**
 	 * Determine when wp_head has been triggered.
 	 */
-	public function wpHeadFinished() {
+	public static function wpHeadFinished() {
 		self::$wpHeadComplete = true;
 	}
 
@@ -368,27 +405,21 @@ abstract class Templates {
 		$template = '';
 
 
-		if ( apply_filters( 'cpl_template_use_react', false, $this ) ) {
-			$template = $this->get_template_hierarchy( 'app', [ 'disable_view_check' => true ] );
-		} else {
+		$wp_query = $this->get_global_query_object();
 
-			$wp_query = $this->get_global_query_object();
+		$types     = $this->get_post_types();
+		$taxonomies = $this->get_taxonomies();
 
-			$types     = $this->get_post_types();
-			$taxonomies = $this->get_taxonomies();
+		if ( $wp_query->is_tax( $taxonomies ) ) {
+			$template = $this->get_template_hierarchy( 'archive-tax', [ 'disable_view_check' => true ] );
+		}
 
-			if ( $wp_query->is_tax( $taxonomies ) ) {
-				$template = $this->get_template_hierarchy( 'archive-tax', [ 'disable_view_check' => true ] );
-			}
+		if ( $wp_query->is_post_type_archive( $types ) ) {
+			$template = $this->get_template_hierarchy( 'archive', [ 'disable_view_check' => true ] );
+		}
 
-			if ( $wp_query->is_post_type_archive( $types ) ) {
-				$template = $this->get_template_hierarchy( 'archive', [ 'disable_view_check' => true ] );
-			}
-
-			if ( $wp_query->is_singular( $types ) ) {
-				$template = $this->get_template_hierarchy( 'single', [ 'disable_view_check' => true ] );
-			}
-
+		if ( $wp_query->is_singular( $types ) ) {
+			$template = $this->get_template_hierarchy( 'single', [ 'disable_view_check' => true ] );
 		}
 
 		// apply filters
