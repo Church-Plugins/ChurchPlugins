@@ -56,6 +56,14 @@ if ( ! class_exists( 'ChurchPlugins\Setup\Plugin', false ) ) {
 		 */
 		protected function __construct() {
 			add_action( 'cp_core_loaded', [ $this, 'maybe_setup' ], -9999 );
+			register_activation_hook( $this->get_plugin_file(), [ $this, 'activate' ] );
+		}
+
+		/**
+		 * Get the plugin version
+		 */
+		public function get_version() {
+			return false; // for existing plugins extending Plugin, we don't want migrations to be run until they specify a version
 		}
 
 		/**
@@ -104,6 +112,16 @@ if ( ! class_exists( 'ChurchPlugins\Setup\Plugin', false ) ) {
 		public function get_id() {
 			$path_sections = array_filter( explode( '/', $this->get_plugin_dir() ) );
 			return array_pop( $path_sections );
+		}
+
+		/**
+		 * Get the plugin file
+		 *
+		 * @return string
+		 */
+		public function get_plugin_file() {
+			$plugin_folder = basename( $this->get_plugin_dir() );
+			return trailingslashit( $this->get_plugin_dir() ) . $plugin_folder . '.php';
 		}
 
 		/**
@@ -173,6 +191,50 @@ if ( ! class_exists( 'ChurchPlugins\Setup\Plugin', false ) ) {
 		 */
 		public function is_debug_mode() {
 			return defined( 'WP_DEBUG' ) && WP_DEBUG;
+		}
+
+		/**
+		 * Handles the activation of the plugin
+		 *
+		 * @return void
+		 */
+		public function activate() {
+			// get old version (if exists)
+			$old_version = get_option( $this->get_id() . '_db_version', false );
+			$new_version = $this->get_version();
+
+			// update version
+			update_option( $this->get_id() . '_db_version', $new_version );
+
+			// run migrations
+			if ( $old_version && $new_version && $old_version !== $new_version ) {
+				$this->migrate_db( $old_version, $new_version );
+			}
+		}
+
+		/**
+		 * Runs database migrations
+		 *
+		 * @return void
+		 */
+		public function migrate_db( $old_version, $new_version ) {
+			$migrations = include $this->get_plugin_dir() . 'migrations.php';
+
+			if ( empty( $migrations ) ) {
+				return;
+			}
+
+			foreach ( $migrations as $version => $migration ) {
+				if ( version_compare( $old_version, $version, '<' ) && version_compare( $new_version, $version, '>=' ) ) {
+					if ( isset( $migration['up'] ) && is_callable( $migration['up'] ) ) {
+						$migration['up']();
+					}
+				} elseif ( version_compare( $old_version, $version, '>=' ) && version_compare( $new_version, $version, '<' ) ) {
+					if ( isset( $migration['down'] ) && is_callable( $migration['down'] ) ) {
+						$migration['down']();
+					}
+				}
+			}
 		}
 	}
 }
