@@ -39,6 +39,13 @@ if ( ! class_exists( 'ChurchPlugins\Setup\Plugin', false ) ) {
 		public $logging;
 
 		/**
+		 * Migrator
+		 *
+		 * @var Migrator|null
+		 */
+		protected $migrator = null;
+
+		/**
 		 * Only make one instance of Plugin
 		 *
 		 * @return Plugin
@@ -56,7 +63,7 @@ if ( ! class_exists( 'ChurchPlugins\Setup\Plugin', false ) ) {
 		 */
 		protected function __construct() {
 			add_action( 'cp_core_loaded', [ $this, 'maybe_setup' ], -9999 );
-			register_activation_hook( $this->get_plugin_file(), [ $this, 'activate' ] );
+			add_action( 'plugins_loaded', [ $this, 'maybe_migrate' ] );
 		}
 
 		/**
@@ -194,11 +201,15 @@ if ( ! class_exists( 'ChurchPlugins\Setup\Plugin', false ) ) {
 		}
 
 		/**
-		 * Handles the activation of the plugin
+		 * Handles the table upgrades for the plugin
 		 *
 		 * @return void
 		 */
-		public function activate() {
+		public function maybe_migrate() {
+			if ( ! $this->migrator ) {
+				return;
+			}
+
 			// get old version (if exists)
 			$old_version = get_option( $this->get_id() . '_db_version', false );
 			$new_version = $this->get_version();
@@ -206,35 +217,12 @@ if ( ! class_exists( 'ChurchPlugins\Setup\Plugin', false ) ) {
 			// update version
 			update_option( $this->get_id() . '_db_version', $new_version );
 
-			// run migrations
-			if ( $old_version && $new_version && $old_version !== $new_version ) {
-				$this->migrate_db( $old_version, $new_version );
-			}
-		}
-
-		/**
-		 * Runs database migrations
-		 *
-		 * @return void
-		 */
-		public function migrate_db( $old_version, $new_version ) {
-			$migrations = include $this->get_plugin_dir() . 'migrations.php';
-
-			if ( empty( $migrations ) ) {
+			// don't migrate if we don't need to
+			if ( ! $old_version || ! $new_version || $old_version === $new_version ) {
 				return;
 			}
 
-			foreach ( $migrations as $version => $migration ) {
-				if ( version_compare( $old_version, $version, '<' ) && version_compare( $new_version, $version, '>=' ) ) {
-					if ( isset( $migration['up'] ) && is_callable( $migration['up'] ) ) {
-						$migration['up']();
-					}
-				} elseif ( version_compare( $old_version, $version, '>=' ) && version_compare( $new_version, $version, '<' ) ) {
-					if ( isset( $migration['down'] ) && is_callable( $migration['down'] ) ) {
-						$migration['down']();
-					}
-				}
-			}
+			$this->migrator->run_migrations( $old_version, $new_version );			
 		}
 	}
 }
