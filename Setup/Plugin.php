@@ -62,8 +62,9 @@ if ( ! class_exists( 'ChurchPlugins\Setup\Plugin', false ) ) {
 		 * Class constructor
 		 */
 		protected function __construct() {
-			add_action( 'cp_core_loaded', [ $this, 'maybe_setup' ], -9999 );
-			add_action( 'plugins_loaded', [ $this, 'maybe_migrate' ] );
+			// we want migration to run just before setup
+			add_action( 'cp_core_loaded', [ $this, 'maybe_migrate' ], -9999 );
+			add_action( 'cp_core_loaded', [ $this, 'maybe_setup' ], -9998 );
 		}
 
 		/**
