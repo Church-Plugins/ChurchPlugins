@@ -6,6 +6,9 @@ Common utility and helper functions.
 **License:**           GPLv2 or later
 **License URI:**       [http://www.gnu.org/licenses/gpl-2.0.html](http://www.gnu.org/licenses/gpl-2.0.html)
 
+### 1.1.8
+* Add `virtual` icon
+
 ### 1.1.4 - 09/25/2024
 * Style updates for template (add box-sizing)
 

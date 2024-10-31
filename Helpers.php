@@ -596,6 +596,9 @@ if ( ! class_exists( 'ChurchPlugins\Helpers' ) ) :
 				case 'accessible' :
 					$markup = '<span class="material-icons-outlined">accessible</span>';
 					break;
+				case 'virtual':
+					$markup = '<span class="material-icons-outlined">videocam</span>';
+					break;
 				case 'facebook':
 				case 'instagram':
 				case 'linkedin':
