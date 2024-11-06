@@ -27,7 +27,7 @@ if ( ! class_exists( 'ChurchPlugins_1_1_8', false ) ) {
 		 * @var   string
 		 * @since 1.0.0
 		 */
-		const VERSION = '1.1.17';
+		const VERSION = '1.1.8';
 
 		/**
 		 * Current version hook priority.
@@ -36,7 +36,7 @@ if ( ! class_exists( 'ChurchPlugins_1_1_8', false ) ) {
 		 * @var   int
 		 * @since 1.0.0
 		 */
-		const PRIORITY = 9966;
+		const PRIORITY = 9965;
 
 		/**
 		 * Single instance of the ChurchPlugins object
