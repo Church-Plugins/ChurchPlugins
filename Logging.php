@@ -188,8 +188,21 @@ class Logging {
 	 *
 	 * @return string Log data.
 	 */
-	public function get_file_contents() {
-		return $this->get_file();
+	public function get_file_contents( $reverse = true ) {
+
+		$file = $this->get_file();
+
+		if ( empty( $file ) || ! $reverse ) {
+			return $file;
+		}
+
+		// reverse the log file so the newest entries are at the top
+		$contents = array_reverse( explode( "\n", $this->get_file() ) );
+
+		// remove empty lines
+		$contents = array_filter( $contents );
+
+		return implode( "\n", $contents );
 	}
 
 	/**
@@ -307,7 +320,7 @@ class Logging {
 
 		}
 
-		$this->log( $message );
+		$this->log( $message, true );
 	}
 
 }

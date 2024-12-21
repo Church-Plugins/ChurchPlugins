@@ -2,9 +2,12 @@
 Common utility and helper functions.
 
 **Contributors:**      [tannerm](https://github.com/tannerm), [jjroley](https://github.com/jjroley)
-**Stable tag:**        1.0.18
+**Stable tag:**        1.0.19
 **License:**           GPLv2 or later
 **License URI:**       [http://www.gnu.org/licenses/gpl-2.0.html](http://www.gnu.org/licenses/gpl-2.0.html)
+
+### 1.1.9
+* Updates to Logging
 
 ### 1.1.8
 * Add `virtual` icon
