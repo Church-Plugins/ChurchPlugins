@@ -1,4 +1,5 @@
 @import 'mixins/_breakpoints.scss';
+@import 'elements/button';
 
 .cp-pg-template {
 	max-width: 90vw;
@@ -31,6 +32,23 @@
 			color: var(--cpl--text-color);
 		}
 
+	}
+
+	.pagination {
+		margin-top: var(--cp-gap--md);
+	}
+
+	.pagination, .nav-links {
+		display: flex;
+		justify-content: center;
+		gap: var(--cp-gap--md);
+		align-items: center;
+
+		.prev, .next {
+			@extend %cp-button;
+			@extend %cp-button--outline;
+			@extend %cp-button--is-small;
+		}
 	}
 }
 
