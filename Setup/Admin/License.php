@@ -22,6 +22,10 @@ class License {
 
 	protected $settings_url;
 
+	protected $constant_aap = 'CHURCHPLUGINS_LICENSE';
+
+	protected $constant = null;
+
 	/**
 	 * Class constructor
 	 */
@@ -29,15 +33,70 @@ class License {
 		$this->id           = $id;
 		$this->edd_id       = $edd_id;
 		$this->store_url    = $store_url;
-		$this->plugin_file  = $plugin_file;
+		$this->plugin_file   = $plugin_file;
 		$this->settings_url = $settings_url;
+		$this->constant     = strtoupper( $this->id ) . '_LICENSE';
 
+		add_action ( 'admin_init', array( $this, 'check_license_constant' ), 3 );
 		add_action( 'admin_init', array( $this, 'check_license' ) );
 		add_action( 'admin_init', array( $this, 'activate_license' ) );
 		add_action( 'admin_init', array( $this, 'deactivate_license' ) );
 		add_action( 'admin_init', array( $this, 'plugin_updater' ), 5 );
 		add_action( 'admin_notices', [ $this, 'admin_notices' ] );
 		add_action( 'rest_api_init', [ $this, 'register_rest_routes' ] );
+	}
+
+	/**
+	 * Handle activation of license key from a constant
+	 *
+	 * @since  1.1.9
+	 *
+	 * @author Tanner Moushey, 12/24/24
+	 */
+	public function check_license_constant() {
+
+		// bale early if we already have an active license
+		if ( $this->is_active() ) {
+			return;
+		}
+
+		if ( ! $const = $this->get_constant_license() ) {
+			return;
+		}
+
+		$license = $this->get( 'license' );
+
+		if ( $license == $const ) {
+			return;
+		}
+
+		$this->update( 'license', $const );
+
+		try {
+			$this->maybe_activate_license( $this->get( 'license' ) );
+		} catch ( \Exception $e ) {
+			error_log( $e->getMessage() );
+		}
+	}
+
+	/**
+	 * Get the license from a constant
+	 *
+	 * @return false|mixed
+	 * @since  1.1.9
+	 *
+	 * @author Tanner Moushey, 12/31/24
+	 */
+	protected function get_constant_license() {
+		if ( defined( $this->constant ) ) {
+			return constant( $this->constant );
+		}
+
+		if ( defined( $this->constant_aap ) ) {
+			return constant( $this->constant_aap );
+		}
+
+		return false;
 	}
 
 	/**
@@ -223,6 +282,10 @@ class License {
 			'is_active'   => $this->is_active(),
 			'attributes'  => [],
 		];
+
+		if ( $this->get_constant_license() ) {
+			$args['desc'] = __( 'This license key is set by a constant and cannot be changed.', 'Church Plugins' );
+		}
 
 		if ( $this->get( 'license' ) ) {
 			$args['nonce'] = wp_nonce_field( $this->get_nonce_slug(), $this->get_nonce_slug(), true, false );
@@ -487,16 +550,8 @@ class License {
 					$message = __( 'An error occurred, please try again.' );
 				}
 
-				$redirect = add_query_arg(
-					array(
-						'sl_activation' => 'false',
-						'message'       => rawurlencode( $message ),
-					),
-					$this->settings_url
-				);
-
-				wp_safe_redirect( $redirect );
-				exit();
+				set_transient( $this->get_license_check_slug(), 'failed:' . $message, DAY_IN_SECONDS );
+				return;
 			}
 
 			$license_data = json_decode( wp_remote_retrieve_body( $response ) );
