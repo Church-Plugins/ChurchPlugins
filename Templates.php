@@ -36,6 +36,11 @@ abstract class Templates {
 	 */
 	protected static $template = false;
 
+	/**
+	 * @var bool Did the shortcode run?
+	 */
+	protected static $did_shortcode = false;
+
 	/*
 	 * List of templates which have compatibility fixes
 	 */
@@ -280,7 +285,7 @@ abstract class Templates {
 	public function template_shortcode() {
 		global $wp_filter;
 
-		if ( ! self::$template ) {
+		if ( ! self::$template || self::$did_shortcode ) {
 			return '';
 		}
 
@@ -291,6 +296,8 @@ abstract class Templates {
 		// save all the_content filters and remove so that page builders don't interfere
 		$saved_filters = isset($wp_filter['the_content']) ? clone( $wp_filter['the_content'] ) : null;
 		remove_all_filters( 'the_content' );
+
+		self::$did_shortcode = true;
 
 		ob_start();
 		include self::$template;
