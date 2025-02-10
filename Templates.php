@@ -74,10 +74,9 @@ abstract class Templates {
 			add_filter( 'body_class', __CLASS__ . '::theme_body_class' );
 		}
 
+		add_shortcode( 'cp-template', [ $this, 'template_shortcode' ] );
 		add_action( 'cp_do_header', __CLASS__ . '::do_header' );
 		add_action( 'cp_do_footer', __CLASS__ . '::do_footer' );
-
-
 	}
 
 	public static function do_header() {
@@ -251,7 +250,10 @@ abstract class Templates {
 
 		self::$template = $template;
 
-		self::$template = $template;
+		// check if post content has 'cp-template' shortcode
+		if ( apply_filters( 'cp_disable_template', has_shortcode( get_the_content(), 'cp-template' ), $template, $this ) ) {
+			return $original_template;
+		}
 
 		if ( function_exists( 'wp_is_block_theme' ) && wp_is_block_theme() ) {
 
@@ -265,6 +267,41 @@ abstract class Templates {
 		} else {
 			return $template;
 		}
+	}
+
+	/**
+	 * Add shortcode to output the current template
+	 *
+	 * @return mixed|string|null
+	 * @since  1.1.10
+	 *
+	 * @author Tanner Moushey, 2/9/25
+	 */
+	public function template_shortcode() {
+		global $wp_filter;
+
+		if ( ! self::$template ) {
+			return '';
+		}
+
+		// remove the header and footer
+		remove_action( 'cp_do_header', __CLASS__ . '::do_header' );
+		remove_action( 'cp_do_footer', __CLASS__ . '::do_footer' );
+
+		// save all the_content filters and remove so that page builders don't interfere
+		$saved_filters = isset($wp_filter['the_content']) ? clone( $wp_filter['the_content'] ) : null;
+		remove_all_filters( 'the_content' );
+
+		ob_start();
+		include self::$template;
+		$content = ob_get_clean();
+
+		// restore the_content filters
+		if ( $saved_filters ) {
+			$wp_filter['the_content'] = $saved_filters;
+		}
+
+		return apply_filters( 'cp_template_shortcode', $content, self::$template, $this );
 	}
 
 	/**

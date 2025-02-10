@@ -1,6 +1,6 @@
 <?php
 
-if ( ! class_exists( 'ChurchPlugins_1_1_9', false ) ) {
+if ( ! class_exists( 'ChurchPlugins_1_1_10', false ) ) {
 
 	/**
 	 * Handles checking for and loading the newest version of ChurchPlugins
@@ -11,7 +11,7 @@ if ( ! class_exists( 'ChurchPlugins_1_1_9', false ) ) {
 	 * @package   ChurchPlugins
 	 * @license   GPL-2.0+
 	 */
-	class ChurchPlugins_1_1_9 {
+	class ChurchPlugins_1_1_10 {
 
 		/**
 		 * Registered plugins
@@ -27,7 +27,7 @@ if ( ! class_exists( 'ChurchPlugins_1_1_9', false ) ) {
 		 * @var   string
 		 * @since 1.0.0
 		 */
-		const VERSION = '1.1.9';
+		const VERSION = '1.1.10';
 
 		/**
 		 * Current version hook priority.
@@ -36,12 +36,12 @@ if ( ! class_exists( 'ChurchPlugins_1_1_9', false ) ) {
 		 * @var   int
 		 * @since 1.0.0
 		 */
-		const PRIORITY = 9964;
+		const PRIORITY = 9963;
 
 		/**
 		 * Single instance of the ChurchPlugins object
 		 *
-		 * @var ChurchPlugins_1_1_9
+		 * @var ChurchPlugins_1_1_10
 		 */
 		public static $single_instance = null;
 
@@ -59,7 +59,7 @@ if ( ! class_exists( 'ChurchPlugins_1_1_9', false ) ) {
 		 * Creates/returns the single instance ChurchPlugins object
 		 *
 		 * @since  1.0.0
-		 * @return ChurchPlugins_1_1_9 Single instance object
+		 * @return ChurchPlugins_1_1_10 Single instance object
 		 */
 		public static function initiate() {
 			if ( null === self::$single_instance ) {
@@ -173,6 +173,6 @@ if ( ! class_exists( 'ChurchPlugins_1_1_9', false ) ) {
 		}
 	}
 
-	return ChurchPlugins_1_1_9::initiate();
+	return ChurchPlugins_1_1_10::initiate();
 
 }// End if().
