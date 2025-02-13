@@ -102,6 +102,9 @@ if ( ! class_exists( 'ChurchPlugins_1_1_10', false ) ) {
 				define( 'CHURCHPLUGINS_DIR', trailingslashit( dirname( __FILE__ ) ) );
 			}
 
+			require_once( CHURCHPLUGINS_DIR . 'Utils/WP_Async_Request.php' );
+			require_once( CHURCHPLUGINS_DIR . 'Utils/WP_Background_Process.php' );
+
 			require_once( CHURCHPLUGINS_DIR . 'Exception.php' );
 			require_once( CHURCHPLUGINS_DIR . 'Setup/Init.php' );
 			require_once( CHURCHPLUGINS_DIR . 'Admin/_Init.php' );

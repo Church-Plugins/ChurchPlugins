@@ -7,6 +7,8 @@
 
 namespace ChurchPlugins\Utils;
 
+use stdClass;
+
 /**
  * Abstract WP_Background_Process class.
  *
