@@ -82,6 +82,9 @@ abstract class Templates {
 		add_shortcode( 'cp-template', [ $this, 'template_shortcode' ] );
 		add_action( 'cp_do_header', __CLASS__ . '::do_header' );
 		add_action( 'cp_do_footer', __CLASS__ . '::do_footer' );
+
+		// pagination
+		add_action( 'cp_after_archive', 'the_posts_pagination' );
 	}
 
 	public static function do_header() {
@@ -187,6 +190,24 @@ abstract class Templates {
 		}
 
 		return apply_filters( 'cp_template_is_query', $cpl_query, $this );
+	}
+
+	/**
+	 * Get the type of the current post
+	 *
+	 * @param $type
+	 *
+	 * @return array|false|mixed|string|string[]
+	 * @since  1.1.11
+	 *
+	 * @author Tanner Moushey, 3/1/25
+	 */
+	public static function get_type( $type = false ) {
+		if ( ! $type ) {
+			$type = get_post_type();
+		}
+
+		return str_replace( [ 'cp_', '_' ], [ '', '-' ], $type );
 	}
 
 	/**
