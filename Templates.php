@@ -518,7 +518,10 @@ abstract class Templates {
 	}
 
 	public function get_template_part( $template, $args = [] ) {
-		$template = $this->get_template_hierarchy( $template );
+		if ( ! $template = $this->get_template_hierarchy( $template ) ) {
+			return;
+		}
+
 		include( $template );
 	}
 
