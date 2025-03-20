@@ -62,9 +62,9 @@ if ( ! class_exists( 'ChurchPlugins\Setup\Plugin', false ) ) {
 		 * Class constructor
 		 */
 		protected function __construct() {
-			// we want migration to run just before setup
-			add_action( 'cp_core_loaded', [ $this, 'maybe_migrate' ], -9999 );
-			add_action( 'cp_core_loaded', [ $this, 'maybe_setup' ], -9998 );
+			// we want migration to run just after setup
+			add_action( 'cp_core_loaded', [ $this, 'maybe_migrate' ], -9998 );
+			add_action( 'cp_core_loaded', [ $this, 'maybe_setup' ], -9999 );
 		}
 
 		/**
@@ -96,6 +96,16 @@ if ( ! class_exists( 'ChurchPlugins\Setup\Plugin', false ) ) {
 		 * Register hooks
 		 */
 		protected function actions() {}
+
+		public function activate() {
+			update_option( $this->get_id() . '-version', $this->get_version() );
+
+			do_action( 'cp_activated_' . $this->get_id(), $this );
+		}
+
+		public function deactivate() {
+			do_action( 'cp_deactivated_' . $this->get_id(), $this );
+		}
 
 		/**
 		 * Get plugin directory. Must include trailing slash.
@@ -212,18 +222,18 @@ if ( ! class_exists( 'ChurchPlugins\Setup\Plugin', false ) ) {
 			}
 
 			// get old version (if exists)
-			$old_version = get_option( $this->get_id() . '_db_version', false );
+			$old_version = get_option( $this->get_id() . '-version', '0.0.1' );
 			$new_version = $this->get_version();
 
-			// update version
-			update_option( $this->get_id() . '_db_version', $new_version );
-
 			// don't migrate if we don't need to
-			if ( ! $old_version || ! $new_version || $old_version === $new_version ) {
+			if ( $old_version === $new_version ) {
 				return;
 			}
 
-			$this->migrator->run_migrations( $old_version, $new_version );			
+			$this->migrator->run_migrations( $old_version, $new_version );
+
+			// update version
+			update_option( $this->get_id() . '-version', $new_version );
 		}
 	}
 }
