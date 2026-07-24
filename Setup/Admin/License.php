@@ -116,7 +116,9 @@ class License {
 		$license = $request->get_param( 'license' );
 
 		try {
-			$this->activate_license( $license );
+			// Persist the key so deactivation, the daily check, and the updater can read it.
+			$this->update( 'license', $license );
+			$this->maybe_activate_license( $license );
 			return new \WP_REST_Response(
 				[
 					'success' => true,
@@ -137,7 +139,7 @@ class License {
 	 */
 	public function rest_deactivate_license() {
 		try {
-			$this->deactivate_license();
+			$this->maybe_deactivate_license();
 			return new \WP_REST_Response(
 				[
 					'success' => true,
