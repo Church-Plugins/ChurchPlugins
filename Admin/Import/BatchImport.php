@@ -145,6 +145,10 @@ class BatchImport {
 		$csv = [];
 
 		while( $line = fgetcsv( $csv_file ) ) {
+			// Convert each field to UTF-8 if needed
+			$line = array_map( function( $field ) {
+				return $this->convert_to_utf8( $field );
+			}, $line );
 			$csv[] = $line;
 		};
 
@@ -164,6 +168,52 @@ class BatchImport {
 		array_shift( $csv );
 
 		return $csv;
+	}
+
+	/**
+	 * Convert a string to UTF-8 encoding
+	 *
+	 * @since 1.0.6
+	 * @param string $string String to convert
+	 * @return string UTF-8 encoded string
+	 */
+	private function convert_to_utf8( $string ) {
+		if ( empty( $string ) ) {
+			return $string;
+		}
+
+		// Check if already valid UTF-8
+		if ( mb_check_encoding( $string, 'UTF-8' ) ) {
+			return $string;
+		}
+
+		// Try to detect the encoding
+		$detected_encoding = mb_detect_encoding( $string, ['UTF-8', 'Windows-1252', 'ISO-8859-1', 'ASCII'], true );
+
+		// If we detected an encoding, convert it
+		if ( $detected_encoding && $detected_encoding !== 'UTF-8' ) {
+			$converted = mb_convert_encoding( $string, 'UTF-8', $detected_encoding );
+			if ( $converted !== false ) {
+				return $converted;
+			}
+		}
+
+		// Fallback: try Windows-1252 (most common source of these issues)
+		$converted = mb_convert_encoding( $string, 'UTF-8', 'Windows-1252' );
+		if ( $converted !== false ) {
+			return $converted;
+		}
+
+		// Last resort: use iconv if available
+		if ( function_exists( 'iconv' ) ) {
+			$converted = iconv( 'Windows-1252', 'UTF-8//TRANSLIT//IGNORE', $string );
+			if ( $converted !== false ) {
+				return $converted;
+			}
+		}
+
+		// If all else fails, return the original string
+		return $string;
 	}
 
 	/**

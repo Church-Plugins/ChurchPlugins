@@ -1,6 +1,6 @@
 <?php
 
-if ( ! class_exists( 'ChurchPlugins_1_1_8', false ) ) {
+if ( ! class_exists( 'ChurchPlugins_1_1_14', false ) ) {
 
 	/**
 	 * Handles checking for and loading the newest version of ChurchPlugins
@@ -11,7 +11,7 @@ if ( ! class_exists( 'ChurchPlugins_1_1_8', false ) ) {
 	 * @package   ChurchPlugins
 	 * @license   GPL-2.0+
 	 */
-	class ChurchPlugins_1_1_8 {
+	class ChurchPlugins_1_1_14 {
 
 		/**
 		 * Registered plugins
@@ -27,7 +27,7 @@ if ( ! class_exists( 'ChurchPlugins_1_1_8', false ) ) {
 		 * @var   string
 		 * @since 1.0.0
 		 */
-		const VERSION = '1.1.8';
+		const VERSION = '1.1.14';
 
 		/**
 		 * Current version hook priority.
@@ -36,12 +36,12 @@ if ( ! class_exists( 'ChurchPlugins_1_1_8', false ) ) {
 		 * @var   int
 		 * @since 1.0.0
 		 */
-		const PRIORITY = 9965;
+		const PRIORITY = 9959;
 
 		/**
 		 * Single instance of the ChurchPlugins object
 		 *
-		 * @var ChurchPlugins_1_1_8
+		 * @var ChurchPlugins_1_1_14
 		 */
 		public static $single_instance = null;
 
@@ -59,7 +59,7 @@ if ( ! class_exists( 'ChurchPlugins_1_1_8', false ) ) {
 		 * Creates/returns the single instance ChurchPlugins object
 		 *
 		 * @since  1.0.0
-		 * @return ChurchPlugins_1_1_8 Single instance object
+		 * @return ChurchPlugins_1_1_14 Single instance object
 		 */
 		public static function initiate() {
 			if ( null === self::$single_instance ) {
@@ -102,6 +102,9 @@ if ( ! class_exists( 'ChurchPlugins_1_1_8', false ) ) {
 				define( 'CHURCHPLUGINS_DIR', trailingslashit( dirname( __FILE__ ) ) );
 			}
 
+			require_once( CHURCHPLUGINS_DIR . 'Utils/WP_Async_Request.php' );
+			require_once( CHURCHPLUGINS_DIR . 'Utils/WP_Background_Process.php' );
+
 			require_once( CHURCHPLUGINS_DIR . 'Exception.php' );
 			require_once( CHURCHPLUGINS_DIR . 'Setup/Init.php' );
 			require_once( CHURCHPLUGINS_DIR . 'Admin/_Init.php' );
@@ -121,6 +124,8 @@ if ( ! class_exists( 'ChurchPlugins_1_1_8', false ) ) {
 			require_once( CHURCHPLUGINS_DIR . 'Controllers/Controller.php' );
 
 			require_once( CHURCHPLUGINS_DIR . 'RequestAPI/Base.php' );
+
+			do_action( 'cp_core_files_included' );
 
 			if ( ! defined( 'CHURCHPLUGINS_URL' ) ) {
 				define( 'CHURCHPLUGINS_URL', trailingslashit( CMB2_Utils::get_url_from_dir( CHURCHPLUGINS_DIR ) ) );
@@ -173,6 +178,6 @@ if ( ! class_exists( 'ChurchPlugins_1_1_8', false ) ) {
 		}
 	}
 
-	return ChurchPlugins_1_1_8::initiate();
+	return ChurchPlugins_1_1_14::initiate();
 
 }// End if().

@@ -599,6 +599,12 @@ if ( ! class_exists( 'ChurchPlugins\Helpers' ) ) :
 				case 'virtual':
 					$markup = '<span class="material-icons-outlined">videocam</span>';
 					break;
+				case 'launch':
+					$markup = '<span class="material-icons-outlined">launch</span>';
+					break;
+				case 'link':
+					$markup = '<span class="material-icons-outlined">attach_file</span>';
+					break;
 				case 'facebook':
 				case 'instagram':
 				case 'linkedin':

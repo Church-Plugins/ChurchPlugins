@@ -50,6 +50,8 @@ class Init {
 	 * @return void
 	 */
 	protected function includes() {
+		require_once( CHURCHPLUGINS_DIR . 'Setup/Migrator.php' );
+
 		require_once( CHURCHPLUGINS_DIR . 'Setup/Admin/License.php' );
 		require_once( CHURCHPLUGINS_DIR . 'Setup/Admin/Updater.php' );
 

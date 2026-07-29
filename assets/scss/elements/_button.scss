@@ -11,7 +11,7 @@
 	--cp-button--line-height: 1.5;
 }
 
-.cp-button {
+%cp-button {
 	border: 1px solid;
 	border-color: var(--cp-button--border-color);
 	border-radius: var(--cp-button--border-radius);
@@ -26,6 +26,47 @@
 	align-items: center;
 	justify-content: center;
 	text-decoration: none;
+
+	&:hover,
+	&:focus {
+		color: var(--cp-button--color--hover);
+		border-color: var(--cp-button--border-color--hover);
+		background: var(--cp-button--bg--hover);
+
+		svg, i,
+		.fl-button-text,
+		span {
+			color: var(--cp-button--color--hover);
+		}
+	}
+
+	&:active,
+	&:focus {
+		color: var(--cp-button--color--hover);
+		border-color: var(--cp-button--border-color--hover);
+		outline:none;
+
+		.fl-button-text {
+			color: var(--cp-button--color--hover);
+		}
+	}
+}
+
+%cp-button--outline {
+	--cp-button--color: var(--cp-color-ui-secondary);
+	--cp-button--color--hover: var(--cp-color-ui-inverted-light);
+	--cp-button--bg: transparent;
+	--cp-button--bg--hover: var(--cp-color-ui-secondary);
+	--cp-button--border-color: var(--cp-button--color);
+}
+
+%cp-button--is-small {
+	--cp-button--padding: var(--cp-ui--gap-y-x--sm);
+	font-size: var(--cp-font-size--sm);
+}
+
+.cp-button {
+	@extend %cp-button;
 
 	svg, i,
 	.fl-button-text,
@@ -64,30 +105,6 @@
 		}
 	}
 
-	&:hover,
-	&:focus {
-		color: var(--cp-button--color--hover);
-		border-color: var(--cp-button--border-color--hover);
-		background: var(--cp-button--bg--hover);
-
-		svg, i,
-		.fl-button-text,
-		span {
-			color: var(--cp-button--color--hover);
-		}
-	}
-
-	&:active,
-	&:focus {
-		color: var(--cp-button--color--hover);
-		border-color: var(--cp-button--border-color--hover);
-		outline:none;
-
-		.fl-button-text {
-			color: var(--cp-button--color--hover);
-		}
-	}
-
 	// sizes
 	&.is-xsmall {
 		--cp-button--padding: var(--cp-ui--gap-y-x--sm);
@@ -95,8 +112,7 @@
 	}
 
 	&.is-small {
-		--cp-button--padding: var(--cp-ui--gap-y-x--sm);
-		font-size: var(--cp-font-size--sm);
+		@extend %cp-button--is-small;
 	}
 
 	&.is-large {
@@ -118,11 +134,7 @@
 
 	&--outlined,
 	&.is-transparent {
-		--cp-button--color: var(--cp-color-ui-secondary);
-		--cp-button--color--hover: var(--cp-color-ui-inverted-light);
-		--cp-button--bg: transparent;
-		--cp-button--bg--hover: var(--cp-color-ui-secondary);
-		--cp-button--border-color: var(--cp-button--color);
+		@extend %cp-button--outline;
 	}
 
 	&--transparent,
