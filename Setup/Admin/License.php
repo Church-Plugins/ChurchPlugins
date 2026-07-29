@@ -139,11 +139,20 @@ class License {
 	 */
 	public function rest_deactivate_license() {
 		try {
-			$this->maybe_deactivate_license();
+			$result = $this->maybe_deactivate_license();
+
+			// Report honestly: the local status is cleared either way ( see
+			// maybe_deactivate_license ), but tell the user when the license server
+			// says the activation was already gone rather than claiming a fresh
+			// deactivation happened.
+			$message = ( isset( $result->license ) && 'deactivated' === $result->license )
+				? __( 'License Deactivated', 'churchplugins' )
+				: __( 'License released — the license server reported it was not active for this site.', 'churchplugins' );
+
 			return new \WP_REST_Response(
 				[
 					'success' => true,
-					'message' => __( 'License Deactivated', 'churchplugins' ),
+					'message' => $message,
 					'status'  => $this->get( 'status' ),
 				],
 				200
@@ -374,10 +383,16 @@ class License {
 		// decode the license data
 		$license_data = json_decode( wp_remote_retrieve_body( $response ) );
 
-		// $license_data->license will be either "deactivated" or "failed"
-		if ( 'deactivated' === $license_data->license ) {
-			$this->update( 'status', 'deactivated' );
-		}
+		// $license_data->license will be either "deactivated" or "failed". A "failed"
+		// deactivation almost always means the activation is already gone on the
+		// license server ( already deactivated, or activated under a different URL ).
+		// In every such case a lingering local "valid" is the one wrong answer — it
+		// locks the UI into a deactivate loop that can never succeed, because the
+		// server will keep reporting "failed" for a license that is not active.
+		// Once we have a well-formed response, clear the local status either way;
+		// transport-level failures still throw above and change nothing.
+		$this->update( 'status', 'deactivated' );
+		delete_transient( $this->get_license_check_slug() );
 
 		return $license_data;
 	}
