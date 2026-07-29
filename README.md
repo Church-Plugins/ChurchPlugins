@@ -1,10 +1,65 @@
-# Toolbox
-Common utility and helper functions.
+# ChurchPlugins Framework
+
+Shared framework and utility library for Church Plugins products (CP Sync, CP Groups, CP
+Library, CP Staff, and others). Provides plugin setup base classes, licensing + updates,
+logging, REST helpers, CMB2 integration, background processing, templates, and icons.
 
 **Contributors:**      [tannerm](https://github.com/tannerm), [jjroley](https://github.com/jjroley)
-**Stable tag:**        1.0.19
+**Stable tag:**        1.1.15
 **License:**           GPLv2 or later
 **License URI:**       [http://www.gnu.org/licenses/gpl-2.0.html](http://www.gnu.org/licenses/gpl-2.0.html)
+
+## How it loads (version arbitration)
+
+Every Church Plugins product bundles its own copy of this framework (usually as a git
+submodule at `includes/ChurchPlugins`). At runtime **only one copy loads: the highest
+version present on the site** — each copy registers a versioned loader class
+(`ChurchPlugins_X_Y_Z`) on a hook priority that decrements with each release, so the
+newest bundled copy wins.
+
+Practical consequences:
+
+- A fix shipped in one plugin's bundled copy is **dormant** on any site where another
+  active plugin bundles a newer version. Framework fixes only reliably reach users when
+  they land on `master`, get a **version bump**, and roll out through plugin releases.
+- When debugging framework behavior on a site, first determine *which plugin's copy won*
+  (compare `const VERSION` across `*/includes/ChurchPlugins/init.php`).
+
+## Development workflow (submodule rule)
+
+1. Land changes in **this repo** first (branch → merge to `master`).
+2. Bump `const VERSION` and the loader class name in `init.php` (and the return type hint
+   in `functions.php`) so the new copy wins arbitration; add a changelog entry below.
+3. Consuming plugins update their submodule gitlink to the **merged master SHA** — never
+   to a feature branch that may be deleted.
+
+## Changelog
+
+### 1.1.15
+* License (REST): activation and deactivation endpoints now call the license workers
+  directly — previously they invoked the admin form handlers, which returned early
+  without the form nonce/button fields, making REST license actions silent no-ops.
+* License (REST): activation persists the submitted key before contacting the license
+  server, so the daily check, deactivation, and the updater can read it.
+* License: deactivation now clears the local license status even when the license server
+  reports the activation was already gone ("failed") — a lingering local `valid` status
+  locked the UI in a deactivate loop that could never succeed. The license-check
+  transient is cleared at the same point.
+* License (REST): deactivation responses report honestly when the server said the
+  activation was already inactive rather than always claiming a fresh deactivation.
+
+### 1.1.10 – 1.1.14
+* Add local copy of `wp_background_process` (background processing without an external
+  dependency)
+* Add support for license key constants (`{ID}_LICENSE` / `CHURCHPLUGINS_LICENSE`)
+* Fix encoding issues in CSV batch imports
+* Update action order and include Migrations
+* Template support + pagination updates; make sure template exists before including it
+* Add `cp-template` filter; only run shortcode once
+* Update pagination styling and add button sass templates
+* Add new icons; strict handling for Material Icons
+* Update logging
+* Remove CMB2 readme
 
 ### 1.1.9
 * Updates to Logging
@@ -57,5 +112,5 @@ Common utility and helper functions.
 * Fix metabox issues
 * Add sideload functionality to importer
 
-* ### 1.0.9 - 4/27/2023
+### 1.0.9 - 4/27/2023
 * Add icons
