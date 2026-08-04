@@ -35,6 +35,17 @@ Practical consequences:
 
 ## Changelog
 
+### 1.1.16
+* New: shared "Church Plugins" top-level admin menu (`Admin\Menu`). Products opt in with
+  `Menu::add_support()` (before `admin_menu` fires) and attach their screens as submenus
+  under `Menu::get_slug()`; the parent menu only registers when at least one product has
+  declared support. The self-referential parent submenu item is removed after products
+  attach (priority 999) so the top-level menu lands on the first product's screen.
+* New: `assets/icons/church-plugins.svg` menu icon, inlined as a base64 data URI and
+  pre-colored to the admin color scheme's base icon color to avoid the black flash
+  before svg-painter repaints it. Capability and position are filterable via
+  `cp_admin_menu_capability` and `cp_admin_menu_position`.
+
 ### 1.1.15
 * License (REST): activation and deactivation endpoints now call the license workers
   directly — previously they invoked the admin form handlers, which returned early
