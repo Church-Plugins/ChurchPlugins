@@ -151,7 +151,9 @@ abstract class Table {
 
 			// if object does not exist, create it
 			if ( ! $object ) {
-				$data   = [ 'origin_id' => $queried_id, 'status' => $post_status ];
+				// include the title so lazily created rows aren't empty in title-based
+				// listings; the column whitelist drops it for tables without a title
+				$data   = [ 'origin_id' => $queried_id, 'title' => get_the_title( $origin_id ), 'status' => $post_status ];
 				$object = static::insert( $data );
 			}
 
