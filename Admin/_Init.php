@@ -47,6 +47,7 @@ class _Init {
 	protected function includes() {
 		require_once( CHURCHPLUGINS_DIR . 'Admin/Import/_Init.php' );
 		require_once( CHURCHPLUGINS_DIR . 'Admin/Options.php' );
+		require_once( CHURCHPLUGINS_DIR . 'Admin/Menu.php' );
 		$this->import = Import\_Init::get_instance();
 	}
 
