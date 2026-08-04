@@ -35,6 +35,9 @@ Practical consequences:
 
 ## Changelog
 
+### 1.1.17
+* Update lazy Table insert to include the title
+
 ### 1.1.16
 * New: shared "Church Plugins" top-level admin menu (`Admin\Menu`). Products opt in with
   `Menu::add_support()` (before `admin_menu` fires) and attach their screens as submenus
