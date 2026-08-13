@@ -286,6 +286,72 @@ abstract class Table {
 	 *
 	 * @author Tanner Moushey
 	 */
+	/**
+	 * Drop characters the table's own columns cannot physically store.
+	 *
+	 * Our custom tables are created without an explicit charset, so on a great many
+	 * existing installs they are 3-byte `utf8` while WordPress core's tables are
+	 * `utf8mb4`. A 4-byte character ( any emoji ) therefore saves fine to wp_posts but
+	 * cannot be stored here. $wpdb does NOT silently truncate in that situation: since
+	 * WP 4.2 process_fields() compares the value against a stripped copy and refuses
+	 * the write outright rather than corrupting data, so insert()/update() fail with
+	 * "Processing the value for the following field failed". A sermon titled
+	 * "1.09 🍊 Worship Service" simply never imports.
+	 *
+	 * Widening the columns would fix it, but ALTERing customer tables on upgrade is not
+	 * something we can do safely at this scale, so the write is retried without the
+	 * offending characters instead. The canonical copy in wp_posts keeps them.
+	 *
+	 * Called only after a write has already failed, so sites whose tables are already
+	 * utf8mb4 never reach this code and nothing they store is altered.
+	 *
+	 * @since 1.1.18
+	 *
+	 * @param array $data Column => value.
+	 * @return array|null The adjusted data, or null when nothing could be adjusted
+	 *                    ( in which case the original failure was not about charset ).
+	 */
+	protected static function strip_unstorable_text( $data ) {
+		global $wpdb;
+
+		$table   = static::get_prop( 'table_name' );
+		$changed = array();
+
+		foreach ( $data as $column => $value ) {
+			if ( ! is_string( $value ) || '' === $value ) {
+				continue;
+			}
+
+			$storable = $wpdb->strip_invalid_text_for_column( $table, $column, $value );
+
+			if ( is_wp_error( $storable ) || $storable === $value ) {
+				continue;
+			}
+
+			$data[ $column ] = $storable;
+			$changed[]       = $column;
+		}
+
+		if ( empty( $changed ) ) {
+			return null;
+		}
+
+		/**
+		 * Fires when a write had to drop characters the column could not store.
+		 *
+		 * Hook this to surface the loss ( the alternative is a silently missing row ).
+		 *
+		 * @since 1.1.18
+		 *
+		 * @param string $table   The table written to.
+		 * @param array  $changed The columns whose values were altered.
+		 * @param array  $data    The adjusted data.
+		 */
+		do_action( 'cp_table_text_stripped', $table, $changed, $data );
+
+		return $data;
+	}
+
 	public static function insert( $data ) {
 		global $wpdb;
 
@@ -311,6 +377,16 @@ abstract class Table {
 		$column_formats = array_merge( array_flip( $data_keys ), $column_formats );
 
 		$wpdb->insert( static::get_prop('table_name' ), $data, $column_formats );
+
+		// Retry without characters this table physically cannot hold. See
+		// strip_unstorable_text() for why the first attempt is allowed to fail.
+		if ( ! $wpdb->insert_id && null !== ( $storable = static::strip_unstorable_text( $data ) ) ) {
+			$wpdb->insert( static::get_prop('table_name' ), $storable, $column_formats );
+
+			if ( $wpdb->insert_id ) {
+				$data = $storable;
+			}
+		}
 
 		if ( ! $wpdb_insert_id = $wpdb->insert_id ) {
 			throw new Exception( 'Could not insert data.' );
@@ -369,7 +445,13 @@ abstract class Table {
 		$column_formats = array_merge( array_flip( $data_keys ), $column_formats );
 
 		if ( false === $wpdb->update( static::get_prop('table_name' ), $data, array( $where => $row_id ), $column_formats ) ) {
-			throw new Exception( sprintf( 'The row (%d) was not updated.', absint( $row_id ) ) );
+			// See strip_unstorable_text(). update() returns 0 ( not false ) when the row
+			// simply did not change, so only a hard failure reaches this branch.
+			$storable = static::strip_unstorable_text( $data );
+
+			if ( null === $storable || false === $wpdb->update( static::get_prop('table_name' ), $storable, array( $where => $row_id ), $column_formats ) ) {
+				throw new Exception( sprintf( 'The row (%d) was not updated.', absint( $row_id ) ) );
+			}
 		}
 
 		$this->delete_cache();
