@@ -35,6 +35,17 @@ Practical consequences:
 
 ## Changelog
 
+### 1.1.18
+* Fix: `Models\Table::insert()`/`update()` retry a failed write without characters the
+  column cannot physically store. Our tables are created without an explicit charset, so
+  on many existing installs they are 3-byte `utf8` while core's are `utf8mb4`. `$wpdb`
+  does not truncate in that case — since WP 4.2 `process_fields()` compares the value
+  against a stripped copy and refuses the write — so any row with an emoji in a text
+  column silently failed to save (one site was losing 152 of 502 sermons on every sync).
+  The retry runs only after a failure, so installs whose tables are already `utf8mb4`
+  never reach it and nothing they store is altered. Fires `cp_table_text_stripped` when
+  characters are dropped.
+
 ### 1.1.17
 * Update lazy Table insert to include the title
 
