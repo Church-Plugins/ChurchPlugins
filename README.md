@@ -45,6 +45,18 @@ Practical consequences:
   The retry runs only after a failure, so installs whose tables are already `utf8mb4`
   never reach it and nothing they store is altered. Fires `cp_table_text_stripped` when
   characters are dropped.
+* Perf: `Setup\Tables\Log` gains a composite `(action, created)` index, and the table
+  version moves to `1.1` so existing installs pick it up through `maybe_update()`.
+  Reporting reads this table as "rows with action X since date Y", which `idx_action`
+  could not serve — `action` has a handful of distinct values and the common ones cover
+  most of the table, so the range on `created` was resolved by scanning matched rows.
+  Measured on a 9.5k-row table, `EXPLAIN` goes from `key=idx_action, rows=13,
+  filtered=33%` to `key=idx_action_created, rows=1, Using index` — the new index covers
+  those queries outright. The version is recorded only once the index is confirmed
+  present: `update_install()` runs on an admin request, and on a large log table the
+  `ALTER` can outlast it, which would otherwise mark the table current with no index on
+  it and nothing would retry. The add is guarded by the same check, so a retry after a
+  partial run is a no-op rather than a duplicate-key error.
 
 ### 1.1.17
 * Update lazy Table insert to include the title
