@@ -36,21 +36,29 @@ Practical consequences:
 ## Changelog
 
 ### 1.1.19
-* Security hardening: `Admin\_Init::request_actions()` dispatches a `cp_action` request
-  only for a logged-in user who has the required capability (default `manage_options`,
-  filter `cp_request_action_capability`), with a valid nonce, and only for action names
-  registered on the `cp_request_actions` allowlist. `request_action_nonce_field()` and
-  `request_action_nonce_url()` build that nonce for a form or a link.
+* Request action hardening: `Admin\_Init::request_actions()` applies stricter checks
+  before it dispatches a `cp_action` request. Names on the `cp_request_actions`
+  allowlist run for a logged-in user who has the required capability (default
+  `manage_options`, filter `cp_request_action_capability`) and a valid core nonce.
+  `request_action_nonce_field()` and `request_action_nonce_url()` build that nonce
+  for a form or a link. `request_action_nonce_url()` returns an HTML-escaped URL,
+  the same way `wp_nonce_url()` does. Names on neither the allowlist, the legacy
+  list, nor the public list are ignored.
 * Front-end forms that verify their own nonce can opt in through
   `cp_public_request_actions`. `cp_send_email` (CP Groups) and `cp_staff_send_email`
   (CP Staff) are registered by default so those email forms keep working. Callbacks on
   that list must verify their own nonce.
 * `cp_legacy_request_actions` keeps the CP Library admin actions
   (`cp_export_items`, `cpl_adapter_import_sermon_audio`,
-  `cpl_adapter_pull_sermon_audio`, `cpl_import_transcript`) available to a
-  logged-in user with the required capability without the core nonce. Registering
-  one of those names on `cp_request_actions` opts it into the nonce check.
-* `cpl_import_transcript` defaults to the `edit_posts` capability so an editor
+  `cpl_adapter_pull_sermon_audio`, `cpl_import_transcript`, `cp_upload_import_file`)
+  available to a logged-in user with the required capability when the request is
+  same-site or carries a valid core nonce for that action. Same-site means the
+  Origin header, or the Referer when Origin is absent, has the same host as
+  `home_url()` or `admin_url()`. A request with neither header, or with a different
+  host, does not run. Registering one of those names on `cp_request_actions` opts
+  it into the nonce check. `cp_upload_import_file` is the CSV upload used by older
+  CP Library releases.
+* `cpl_import_transcript` defaults to the `edit_others_posts` capability so an editor
   can run the transcript import action. Other request actions still default to
   `manage_options`. `cp_request_action_capability` can override either default.
 

@@ -74,9 +74,13 @@ class _Init {
 	 * or {@see self::request_action_nonce_url()}. Any other hook name is ignored.
 	 *
 	 * Names on `cp_legacy_request_actions` run for that same logged-in user
-	 * without the core nonce, so an older copy of CP Library keeps working.
-	 * Registering one of those names on `cp_request_actions` opts it into the
-	 * nonce check. The callback is responsible for its own nonce.
+	 * when the request carries a valid core nonce for the action, or when the
+	 * request is same-site. Same-site means the Origin header, or the Referer
+	 * when Origin is absent, has the same host as {@see home_url()} or
+	 * {@see admin_url()}. A request with neither header, or with a different
+	 * host, does not run. Registering one of those names on
+	 * `cp_request_actions` opts it into the nonce check and does not fall
+	 * through to the legacy list.
 	 *
 	 * A name registered on `cp_public_request_actions` is the opt-in for a
 	 * front-end form. That callback must verify its own nonce. Core does not
@@ -122,7 +126,7 @@ class _Init {
 			return;
 		}
 
-		if ( self::is_legacy_request_action( $action ) ) {
+		if ( self::is_legacy_request_action( $action ) && self::legacy_request_may_run( $action ) ) {
 			do_action( $action, $vars );
 		}
 	}
@@ -164,17 +168,24 @@ class _Init {
 	 * Use this for a link or a script request that carries `cp_action` in the
 	 * query string rather than in a form body.
 	 *
+	 * The return value is escaped for HTML, the same way {@see wp_nonce_url()}
+	 * escapes its result. Echo it in HTML as returned.
+	 *
 	 * @since 1.1.19
 	 *
 	 * @param string $url    URL to modify.
 	 * @param string $action Action name the nonce authorizes.
-	 * @return string
+	 * @return string Escaped URL.
 	 */
 	public static function request_action_nonce_url( $url, $action ) {
-		return add_query_arg(
-			self::REQUEST_ACTION_NONCE_ARG,
-			wp_create_nonce( self::request_action_nonce_action( $action ) ),
-			$url
+		$url = str_replace( '&amp;', '&', $url );
+
+		return esc_html(
+			add_query_arg(
+				self::REQUEST_ACTION_NONCE_ARG,
+				wp_create_nonce( self::request_action_nonce_action( $action ) ),
+				$url
+			)
 		);
 	}
 
@@ -232,7 +243,7 @@ class _Init {
 		 * Capability required to dispatch an allowlisted or legacy cp_action request.
 		 *
 		 * The default is `manage_options`, except `cpl_import_transcript`, which
-		 * defaults to `edit_posts` so an editor can run the transcript import action.
+		 * defaults to `edit_others_posts` so an editor can run the transcript import action.
 		 *
 		 * @since 1.1.19
 		 *
@@ -258,7 +269,7 @@ class _Init {
 	 */
 	protected static function default_request_action_capability( $action ) {
 		if ( 'cpl_import_transcript' === $action ) {
-			return 'edit_posts';
+			return 'edit_others_posts';
 		}
 
 		return 'manage_options';
@@ -317,9 +328,9 @@ class _Init {
 	 * Whether this action is on the legacy list.
 	 *
 	 * These names dispatch for a logged-in user with the required capability
-	 * and do not require the core nonce. CP Library verifies its own nonce in
-	 * the callback once that plugin adopts one. A name that is also registered
-	 * on `cp_request_actions` is handled there and does require the core nonce.
+	 * when {@see self::legacy_request_may_run()} is true. A name that is also
+	 * registered on `cp_request_actions` is handled there and does require the
+	 * core nonce.
 	 *
 	 * @since 1.1.19
 	 *
@@ -328,12 +339,15 @@ class _Init {
 	 */
 	protected static function is_legacy_request_action( $action ) {
 		/**
-		 * Action names that dispatch for an authorized user without the core nonce.
+		 * Action names that dispatch for an authorized user when the request
+		 * is same-site or carries a valid core nonce for that action.
 		 *
 		 * Defaults cover the CP Library admin screens that post `cp_action`
-		 * directly. Plugins can remove a name here once they register it on
-		 * `cp_request_actions` and send {@see self::request_action_nonce_field()}
-		 * or {@see self::request_action_nonce_url()}.
+		 * directly, including `cp_upload_import_file` for the CSV import on
+		 * older CP Library releases. Plugins can remove a name here once they
+		 * register it on `cp_request_actions` and send
+		 * {@see self::request_action_nonce_field()} or
+		 * {@see self::request_action_nonce_url()}.
 		 *
 		 * @since 1.1.19
 		 *
@@ -346,10 +360,120 @@ class _Init {
 				'cpl_adapter_import_sermon_audio',
 				'cpl_adapter_pull_sermon_audio',
 				'cpl_import_transcript',
+				'cp_upload_import_file',
 			)
 		);
 
 		return in_array( $action, self::normalize_action_list( $actions ), true );
+	}
+
+	/**
+	 * Whether a legacy action may run for this request.
+	 *
+	 * A valid core nonce for the action is enough on its own. Otherwise the
+	 * request must be same-site: the Origin header, or the Referer when Origin
+	 * is absent, has the same host as {@see home_url()} or {@see admin_url()}.
+	 * Missing headers and a different host both refuse the request.
+	 *
+	 * @since 1.1.19
+	 *
+	 * @param string $action Requested action name.
+	 * @return bool
+	 */
+	protected static function legacy_request_may_run( $action ) {
+		if ( self::verify_request_action_nonce( $action ) ) {
+			return true;
+		}
+
+		return self::request_is_same_site();
+	}
+
+	/**
+	 * Whether Origin, or Referer when Origin is absent, matches this site's host.
+	 *
+	 * @since 1.1.19
+	 *
+	 * @return bool
+	 */
+	protected static function request_is_same_site() {
+		$origin = self::request_header( 'HTTP_ORIGIN' );
+
+		if ( '' !== $origin ) {
+			return self::host_matches_site( $origin );
+		}
+
+		$referer = self::request_header( 'HTTP_REFERER' );
+
+		if ( '' === $referer ) {
+			return false;
+		}
+
+		return self::host_matches_site( $referer );
+	}
+
+	/**
+	 * Whether a URL's host matches home_url() or admin_url().
+	 *
+	 * @since 1.1.19
+	 *
+	 * @param string $url Absolute URL from a request header.
+	 * @return bool
+	 */
+	protected static function host_matches_site( $url ) {
+		$host = self::url_host( $url );
+
+		if ( '' === $host ) {
+			return false;
+		}
+
+		$allowed = array(
+			self::url_host( home_url() ),
+			self::url_host( admin_url() ),
+		);
+
+		return in_array( $host, $allowed, true );
+	}
+
+	/**
+	 * Lowercase host from a URL, or an empty string.
+	 *
+	 * @since 1.1.19
+	 *
+	 * @param string $url URL to inspect.
+	 * @return string
+	 */
+	protected static function url_host( $url ) {
+		if ( ! is_string( $url ) || '' === $url ) {
+			return '';
+		}
+
+		$host = wp_parse_url( $url, PHP_URL_HOST );
+
+		if ( ! is_string( $host ) || '' === $host ) {
+			return '';
+		}
+
+		return strtolower( $host );
+	}
+
+	/**
+	 * Read one request header used for the same-site check.
+	 *
+	 * @since 1.1.19
+	 *
+	 * @param string $name `HTTP_ORIGIN` or `HTTP_REFERER`.
+	 * @return string
+	 */
+	protected static function request_header( $name ) {
+		if ( 'HTTP_ORIGIN' === $name && isset( $_SERVER['HTTP_ORIGIN'] ) && is_string( $_SERVER['HTTP_ORIGIN'] ) ) {
+			return sanitize_text_field( wp_unslash( $_SERVER['HTTP_ORIGIN'] ) );
+		}
+
+		if ( 'HTTP_REFERER' === $name && isset( $_SERVER['HTTP_REFERER'] ) && is_string( $_SERVER['HTTP_REFERER'] ) ) {
+			return sanitize_text_field( wp_unslash( $_SERVER['HTTP_REFERER'] ) );
+		}
+
+		return '';
 	}
 
 	/**

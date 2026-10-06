@@ -135,6 +135,74 @@ if ( ! function_exists( 'wp_nonce_field' ) ) {
 	}
 }
 
+if ( ! function_exists( 'esc_html' ) ) {
+	/**
+	 * @param string $text Text to escape.
+	 * @return string
+	 */
+	function esc_html( $text ) {
+		return htmlspecialchars( (string) $text, ENT_QUOTES, 'UTF-8' );
+	}
+}
+
+if ( ! function_exists( 'home_url' ) ) {
+	/**
+	 * @return string
+	 */
+	function home_url() {
+		return isset( $GLOBALS['cp_test_home_url'] ) ? $GLOBALS['cp_test_home_url'] : 'https://example.test';
+	}
+}
+
+if ( ! function_exists( 'admin_url' ) ) {
+	/**
+	 * @return string
+	 */
+	function admin_url() {
+		return isset( $GLOBALS['cp_test_admin_url'] ) ? $GLOBALS['cp_test_admin_url'] : 'https://example.test/wp-admin/';
+	}
+}
+
+if ( ! function_exists( 'wp_parse_url' ) ) {
+	/**
+	 * @param string $url       URL to parse.
+	 * @param int    $component PHP_URL_* component, or -1 for all parts.
+	 * @return mixed
+	 */
+	function wp_parse_url( $url, $component = -1 ) {
+		if ( ! is_string( $url ) ) {
+			return null;
+		}
+
+		$parts = parse_url( $url );
+
+		if ( false === $parts ) {
+			return ( -1 === $component ) ? false : null;
+		}
+
+		if ( -1 === $component ) {
+			return $parts;
+		}
+
+		$map = array(
+			PHP_URL_SCHEME   => 'scheme',
+			PHP_URL_HOST     => 'host',
+			PHP_URL_PORT     => 'port',
+			PHP_URL_USER     => 'user',
+			PHP_URL_PASS     => 'pass',
+			PHP_URL_PATH     => 'path',
+			PHP_URL_QUERY    => 'query',
+			PHP_URL_FRAGMENT => 'fragment',
+		);
+
+		if ( ! isset( $map[ $component ] ) || ! isset( $parts[ $map[ $component ] ] ) ) {
+			return null;
+		}
+
+		return $parts[ $map[ $component ] ];
+	}
+}
+
 if ( ! function_exists( 'add_query_arg' ) ) {
 	/**
 	 * @param string $key   Query argument name.

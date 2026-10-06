@@ -43,6 +43,11 @@ class RequestActionsTest extends TestCase {
 		$_GET     = array();
 		$_POST    = array();
 		$_REQUEST = array();
+
+		unset( $_SERVER['HTTP_ORIGIN'], $_SERVER['HTTP_REFERER'] );
+
+		$GLOBALS['cp_test_home_url']  = 'https://example.test';
+		$GLOBALS['cp_test_admin_url'] = 'https://example.test/wp-admin/';
 	}
 
 	/**
@@ -111,11 +116,12 @@ class RequestActionsTest extends TestCase {
 	}
 
 	/**
-	 * A legacy name dispatches for an admin with no nonce.
+	 * A legacy name dispatches for an admin with no core nonce when the Referer host matches.
 	 */
 	public function test_legacy_action_dispatches_for_admin_without_nonce() {
 		$this->set_user( true, array( 'manage_options' ) );
 		$this->set_request( 'cp_export_items', null );
+		$this->set_referer( 'https://example.test/wp-admin/admin.php?page=cpl-tools' );
 
 		$this->dispatch();
 
@@ -123,10 +129,103 @@ class RequestActionsTest extends TestCase {
 	}
 
 	/**
+	 * A same-host Referer runs a legacy action.
+	 */
+	public function test_same_host_referer_runs_legacy_action() {
+		$this->set_user( true, array( 'manage_options' ) );
+		$this->set_request( 'cp_export_items', null );
+		$this->set_referer( 'https://example.test/wp-admin/tools.php' );
+
+		$this->dispatch();
+
+		$this->assertSame( array( 'cp_export_items' ), $this->dispatched_hooks() );
+	}
+
+	/**
+	 * A Referer from a different host does not run a legacy action.
+	 */
+	public function test_foreign_referer_refuses_legacy_action() {
+		$this->set_user( true, array( 'manage_options' ) );
+		$this->set_request( 'cp_export_items', null );
+		$this->set_referer( 'https://other.example/wp-admin/admin.php?page=cpl-tools' );
+
+		$this->dispatch();
+
+		$this->assertSame( array(), $this->dispatched_hooks() );
+	}
+
+	/**
+	 * A legacy action does not run when Origin and Referer are both absent.
+	 */
+	public function test_missing_site_headers_refuse_legacy_action() {
+		$this->set_user( true, array( 'manage_options' ) );
+		$this->set_request( 'cp_export_items', null );
+
+		$this->dispatch();
+
+		$this->assertSame( array(), $this->dispatched_hooks() );
+	}
+
+	/**
+	 * A valid core nonce runs a legacy action when no Referer is present.
+	 */
+	public function test_valid_nonce_runs_legacy_action_without_referer() {
+		$this->set_user( true, array( 'manage_options' ) );
+		$this->set_request( 'cp_export_items', $this->nonce_for( 'cp_export_items' ) );
+
+		$this->dispatch();
+
+		$this->assertSame( array( 'cp_export_items' ), $this->dispatched_hooks() );
+	}
+
+	/**
+	 * Origin is checked before Referer. A different Origin host does not run.
+	 */
+	public function test_foreign_origin_refuses_legacy_action() {
+		$this->set_user( true, array( 'manage_options' ) );
+		$this->set_request( 'cp_export_items', null );
+		$this->set_origin( 'https://other.example' );
+		$this->set_referer( 'https://example.test/wp-admin/admin.php?page=cpl-tools' );
+
+		$this->dispatch();
+
+		$this->assertSame( array(), $this->dispatched_hooks() );
+	}
+
+	/**
+	 * A Referer that matches admin_url() runs when that host differs from home_url().
+	 */
+	public function test_referer_matching_admin_host_runs_legacy_action() {
+		$GLOBALS['cp_test_home_url']  = 'https://www.example.test';
+		$GLOBALS['cp_test_admin_url'] = 'https://admin.example.test/wp-admin/';
+		$this->set_user( true, array( 'manage_options' ) );
+		$this->set_request( 'cp_export_items', null );
+		$this->set_referer( 'https://admin.example.test/wp-admin/admin.php?page=cpl-tools' );
+
+		$this->dispatch();
+
+		$this->assertSame( array( 'cp_export_items' ), $this->dispatched_hooks() );
+	}
+
+	/**
+	 * A same-host Origin runs a legacy action when Referer is absent.
+	 */
+	public function test_same_host_origin_runs_legacy_action() {
+		$this->set_user( true, array( 'manage_options' ) );
+		$this->set_request( 'cpl_adapter_import_sermon_audio', null );
+		$this->set_origin( 'https://example.test' );
+
+		$this->dispatch();
+
+		$this->assertSame( array( 'cpl_adapter_import_sermon_audio' ), $this->dispatched_hooks() );
+	}
+
+	/**
 	 * A legacy name dispatches nothing for a logged-out visitor.
 	 */
 	public function test_legacy_action_dispatches_nothing_for_logged_out_visitor() {
 		$this->set_request( 'cpl_import_transcript', null );
+		$this->set_referer( 'https://example.test/wp-admin/edit.php' );
 
 		$this->dispatch();
 
@@ -139,6 +238,7 @@ class RequestActionsTest extends TestCase {
 	public function test_legacy_action_dispatches_nothing_for_subscriber() {
 		$this->set_user( true, array( 'read' ) );
 		$this->set_request( 'cpl_adapter_import_sermon_audio', null );
+		$this->set_referer( 'https://example.test/wp-admin/admin.php?page=cpl-settings' );
 
 		$this->dispatch();
 
@@ -152,6 +252,7 @@ class RequestActionsTest extends TestCase {
 		$this->set_user( true, array( 'manage_options' ) );
 		$this->allow_actions( array( 'cp_export_items' ) );
 		$this->set_request( 'cp_export_items', null );
+		$this->set_referer( 'https://example.test/wp-admin/admin.php?page=cpl-tools' );
 
 		$this->dispatch();
 
@@ -175,7 +276,7 @@ class RequestActionsTest extends TestCase {
 	 * An editor with a valid core nonce can run the transcript import action.
 	 */
 	public function test_editor_with_nonce_can_run_transcript_import() {
-		$this->set_user( true, array( 'edit_posts' ) );
+		$this->set_user( true, array( 'edit_others_posts' ) );
 		$this->allow_actions( array( 'cpl_import_transcript' ) );
 		$this->set_request( 'cpl_import_transcript', $this->nonce_for( 'cpl_import_transcript' ) );
 
@@ -201,9 +302,10 @@ class RequestActionsTest extends TestCase {
 	 * A transcript import request without a nonce does not dispatch once the action is registered.
 	 */
 	public function test_transcript_import_without_nonce_dispatches_nothing() {
-		$this->set_user( true, array( 'edit_posts' ) );
+		$this->set_user( true, array( 'edit_others_posts' ) );
 		$this->allow_actions( array( 'cpl_import_transcript' ) );
 		$this->set_request( 'cpl_import_transcript', null );
+		$this->set_referer( 'https://example.test/wp-admin/edit.php' );
 
 		$this->dispatch();
 
@@ -214,8 +316,9 @@ class RequestActionsTest extends TestCase {
 	 * An editor can run the transcript import action CP Library posts today.
 	 */
 	public function test_editor_can_run_legacy_transcript_import_without_core_nonce() {
-		$this->set_user( true, array( 'edit_posts' ) );
+		$this->set_user( true, array( 'edit_others_posts' ) );
 		$this->set_request( 'cpl_import_transcript', null );
+		$this->set_referer( 'https://example.test/wp-admin/edit.php?post_type=cpl_item' );
 
 		$this->dispatch();
 
@@ -223,15 +326,42 @@ class RequestActionsTest extends TestCase {
 	}
 
 	/**
-	 * Other legacy actions still require manage_options.
+	 * A user who only has edit_posts cannot run the transcript import action.
 	 */
-	public function test_editor_cannot_run_other_legacy_actions() {
-		$this->set_user( true, array( 'edit_posts' ) );
-		$this->set_request( 'cp_export_items', null );
+	public function test_user_with_edit_posts_cannot_run_transcript_import() {
+		$this->set_user( true, array( 'edit_posts', 'edit_published_posts' ) );
+		$this->set_request( 'cpl_import_transcript', null );
+		$this->set_referer( 'https://example.test/wp-admin/post.php?post=10&action=edit' );
 
 		$this->dispatch();
 
 		$this->assertSame( array(), $this->dispatched_hooks() );
+	}
+
+	/**
+	 * Other legacy actions still require manage_options.
+	 */
+	public function test_editor_cannot_run_other_legacy_actions() {
+		$this->set_user( true, array( 'edit_others_posts' ) );
+		$this->set_request( 'cp_export_items', null );
+		$this->set_referer( 'https://example.test/wp-admin/admin.php?page=cpl-tools' );
+
+		$this->dispatch();
+
+		$this->assertSame( array(), $this->dispatched_hooks() );
+	}
+
+	/**
+	 * The CSV upload action stays available to an admin on a same-site request.
+	 */
+	public function test_legacy_upload_import_file_runs_for_admin_on_same_site() {
+		$this->set_user( true, array( 'manage_options' ) );
+		$this->set_request( 'cp_upload_import_file', null );
+		$this->set_referer( 'https://example.test/wp-admin/admin.php?page=cpl-import' );
+
+		$this->dispatch();
+
+		$this->assertSame( array( 'cp_upload_import_file' ), $this->dispatched_hooks() );
 	}
 
 	/**
@@ -344,9 +474,10 @@ class RequestActionsTest extends TestCase {
 		);
 
 		$this->assertStringContainsString(
-			'cp_action_nonce=' . rawurlencode( $this->nonce_for( 'cp_export_items' ) ),
+			'&amp;cp_action_nonce=' . rawurlencode( $this->nonce_for( 'cp_export_items' ) ),
 			$url
 		);
+		$this->assertStringNotContainsString( '&cp_action_nonce=', $url );
 	}
 
 	/**
@@ -367,6 +498,20 @@ class RequestActionsTest extends TestCase {
 			'logged_in' => $logged_in,
 			'caps'      => $caps,
 		);
+	}
+
+	/**
+	 * @param string $url Referer header value.
+	 */
+	private function set_referer( $url ) {
+		$_SERVER['HTTP_REFERER'] = $url;
+	}
+
+	/**
+	 * @param string $url Origin header value.
+	 */
+	private function set_origin( $url ) {
+		$_SERVER['HTTP_ORIGIN'] = $url;
 	}
 
 	/**
