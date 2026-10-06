@@ -51,11 +51,12 @@ Practical consequences:
 * `cp_legacy_request_actions` keeps the CP Library admin actions
   (`cp_export_items`, `cpl_adapter_import_sermon_audio`,
   `cpl_adapter_pull_sermon_audio`, `cpl_import_transcript`, `cp_upload_import_file`)
-  available to a logged-in user with the required capability when the request is
-  same-site or carries a valid core nonce for that action. Same-site means the
-  Origin header, or the Referer when Origin is absent, has the same host as
-  `home_url()` or `admin_url()`. A request with neither header, or with a different
-  host, does not run. Registering one of those names on `cp_request_actions` opts
+  available to a logged-in user with the required capability. A valid core nonce
+  authorizes the action on any request method. Without that nonce the request
+  must be POST and same-site. Same-site means the Origin header, or the Referer
+  when Origin is absent, has the same scheme, host, and port as `home_url()` or
+  `admin_url()`. A GET or HEAD, missing headers, or a different scheme, host, or
+  port does not run. Registering one of those names on `cp_request_actions` opts
   it into the nonce check. `cp_upload_import_file` is the CSV upload used by older
   CP Library releases.
 * `cpl_import_transcript` defaults to the `edit_others_posts` capability so an editor

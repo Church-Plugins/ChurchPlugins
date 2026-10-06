@@ -74,13 +74,14 @@ class _Init {
 	 * or {@see self::request_action_nonce_url()}. Any other hook name is ignored.
 	 *
 	 * Names on `cp_legacy_request_actions` run for that same logged-in user
-	 * when the request carries a valid core nonce for the action, or when the
-	 * request is same-site. Same-site means the Origin header, or the Referer
-	 * when Origin is absent, has the same host as {@see home_url()} or
-	 * {@see admin_url()}. A request with neither header, or with a different
-	 * host, does not run. Registering one of those names on
-	 * `cp_request_actions` opts it into the nonce check and does not fall
-	 * through to the legacy list.
+	 * when the request carries a valid core nonce for the action, on any
+	 * request method. Without that nonce the request must be POST and
+	 * same-site. Same-site means the Origin header, or the Referer when
+	 * Origin is absent, has the same scheme, host, and port as
+	 * {@see home_url()} or {@see admin_url()}. A GET or HEAD, missing
+	 * headers, or a different scheme, host, or port does not run.
+	 * Registering one of those names on `cp_request_actions` opts it into
+	 * the nonce check and does not fall through to the legacy list.
 	 *
 	 * A name registered on `cp_public_request_actions` is the opt-in for a
 	 * front-end form. That callback must verify its own nonce. Core does not
@@ -165,8 +166,9 @@ class _Init {
 	/**
 	 * Append the cp_action nonce query argument to a URL.
 	 *
-	 * Use this for a link or a script request that carries `cp_action` in the
-	 * query string rather than in a form body.
+	 * The nonce authorizes that action on its own, including a GET. A legacy
+	 * name that arrives without this nonce is accepted only on POST, and only
+	 * when the request is same-site.
 	 *
 	 * The return value is escaped for HTML, the same way {@see wp_nonce_url()}
 	 * escapes its result. Echo it in HTML as returned.
@@ -340,7 +342,7 @@ class _Init {
 	protected static function is_legacy_request_action( $action ) {
 		/**
 		 * Action names that dispatch for an authorized user when the request
-		 * is same-site or carries a valid core nonce for that action.
+		 * carries a valid core nonce, or is a same-site POST.
 		 *
 		 * Defaults cover the CP Library admin screens that post `cp_action`
 		 * directly, including `cp_upload_import_file` for the CSV import on
@@ -370,10 +372,13 @@ class _Init {
 	/**
 	 * Whether a legacy action may run for this request.
 	 *
-	 * A valid core nonce for the action is enough on its own. Otherwise the
-	 * request must be same-site: the Origin header, or the Referer when Origin
-	 * is absent, has the same host as {@see home_url()} or {@see admin_url()}.
-	 * Missing headers and a different host both refuse the request.
+	 * A valid core nonce for the action is enough on its own, for any request
+	 * method. Without that nonce the request must be POST, and then same-site.
+	 * Same-site means the Origin header, or the Referer when Origin is absent,
+	 * has the same scheme, host, and port as {@see home_url()} or
+	 * {@see admin_url()}. A GET or HEAD is refused before that comparison.
+	 * Missing headers, or a different scheme, host, or port, also refuse the
+	 * request.
 	 *
 	 * @since 1.1.19
 	 *
@@ -385,11 +390,33 @@ class _Init {
 			return true;
 		}
 
+		if ( 'POST' !== self::request_method() ) {
+			return false;
+		}
+
 		return self::request_is_same_site();
 	}
 
 	/**
-	 * Whether Origin, or Referer when Origin is absent, matches this site's host.
+	 * Request method, or an empty string when it is missing.
+	 *
+	 * @since 1.1.19
+	 *
+	 * @return string
+	 */
+	protected static function request_method() {
+		if ( ! isset( $_SERVER['REQUEST_METHOD'] ) || ! is_string( $_SERVER['REQUEST_METHOD'] ) ) {
+			return '';
+		}
+
+		return strtoupper( sanitize_text_field( wp_unslash( $_SERVER['REQUEST_METHOD'] ) ) );
+	}
+
+	/**
+	 * Whether Origin, or Referer when Origin is absent, matches this site.
+	 *
+	 * Scheme, host, and port are all compared. An omitted port uses the
+	 * scheme default (80 for http, 443 for https).
 	 *
 	 * @since 1.1.19
 	 *
@@ -399,7 +426,7 @@ class _Init {
 		$origin = self::request_header( 'HTTP_ORIGIN' );
 
 		if ( '' !== $origin ) {
-			return self::host_matches_site( $origin );
+			return self::url_matches_site( $origin );
 		}
 
 		$referer = self::request_header( 'HTTP_REFERER' );
@@ -408,52 +435,74 @@ class _Init {
 			return false;
 		}
 
-		return self::host_matches_site( $referer );
+		return self::url_matches_site( $referer );
 	}
 
 	/**
-	 * Whether a URL's host matches home_url() or admin_url().
+	 * Whether a URL has the same scheme, host, and port as home_url() or admin_url().
 	 *
 	 * @since 1.1.19
 	 *
 	 * @param string $url Absolute URL from a request header.
 	 * @return bool
 	 */
-	protected static function host_matches_site( $url ) {
-		$host = self::url_host( $url );
+	protected static function url_matches_site( $url ) {
+		$parts = self::url_origin( $url );
 
-		if ( '' === $host ) {
+		if ( null === $parts ) {
 			return false;
 		}
 
 		$allowed = array(
-			self::url_host( home_url() ),
-			self::url_host( admin_url() ),
+			self::url_origin( home_url() ),
+			self::url_origin( admin_url() ),
 		);
 
-		return in_array( $host, $allowed, true );
+		return in_array( $parts, $allowed, true );
 	}
 
 	/**
-	 * Lowercase host from a URL, or an empty string.
+	 * Scheme, host, and port for a URL, or null when the URL has no scheme or host.
+	 *
+	 * Host and scheme are lowercase. An omitted port becomes 80 or 443 for
+	 * http and https.
 	 *
 	 * @since 1.1.19
 	 *
 	 * @param string $url URL to inspect.
-	 * @return string
+	 * @return array|null
 	 */
-	protected static function url_host( $url ) {
+	protected static function url_origin( $url ) {
 		if ( ! is_string( $url ) || '' === $url ) {
-			return '';
+			return null;
 		}
 
-		$host = wp_parse_url( $url, PHP_URL_HOST );
+		$scheme = wp_parse_url( $url, PHP_URL_SCHEME );
+		$host   = wp_parse_url( $url, PHP_URL_HOST );
 
-		if ( ! is_string( $host ) || '' === $host ) {
-			return '';
+		if ( ! is_string( $scheme ) || '' === $scheme || ! is_string( $host ) || '' === $host ) {
+			return null;
 		}
 
-		return strtolower( $host );
+		$scheme = strtolower( $scheme );
+		$host   = strtolower( $host );
+		$port   = wp_parse_url( $url, PHP_URL_PORT );
+
+		if ( ! is_int( $port ) ) {
+			if ( 'http' === $scheme ) {
+				$port = 80;
+			} elseif ( 'https' === $scheme ) {
+				$port = 443;
+			} else {
+				return null;
+			}
+		}
+
+		return array(
+			'scheme' => $scheme,
+			'host'   => $host,
+			'port'   => $port,
+		);
 	}
 
 	/**
