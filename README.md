@@ -35,6 +35,17 @@ Practical consequences:
 
 ## Changelog
 
+### 1.1.19
+* Security hardening: `Admin\_Init::request_actions()` dispatches a `cp_action` request
+  only for a logged-in user who has the required capability (default `manage_options`,
+  filter `cp_request_action_capability`), with a valid nonce, and only for action names
+  registered on the `cp_request_actions` allowlist. `request_action_nonce_field()` and
+  `request_action_nonce_url()` build that nonce for a form or a link.
+* Front-end forms that verify their own nonce can opt in through
+  `cp_public_request_actions`. `cp_send_email` (CP Groups) and `cp_staff_send_email`
+  (CP Staff) are registered by default so those email forms keep working. Callbacks on
+  that list must verify their own nonce.
+
 ### 1.1.18
 * Fix: `Models\Table::insert()`/`update()` retry a failed write without characters the
   column cannot physically store. Our tables are created without an explicit charset, so
