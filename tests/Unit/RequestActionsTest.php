@@ -172,6 +172,69 @@ class RequestActionsTest extends TestCase {
 	}
 
 	/**
+	 * An editor with a valid core nonce can run the transcript import action.
+	 */
+	public function test_editor_with_nonce_can_run_transcript_import() {
+		$this->set_user( true, array( 'edit_posts' ) );
+		$this->allow_actions( array( 'cpl_import_transcript' ) );
+		$this->set_request( 'cpl_import_transcript', $this->nonce_for( 'cpl_import_transcript' ) );
+
+		$this->dispatch();
+
+		$this->assertSame( array( 'cpl_import_transcript' ), $this->dispatched_hooks() );
+	}
+
+	/**
+	 * A subscriber cannot run the transcript import action.
+	 */
+	public function test_subscriber_cannot_run_transcript_import() {
+		$this->set_user( true, array( 'read' ) );
+		$this->allow_actions( array( 'cpl_import_transcript' ) );
+		$this->set_request( 'cpl_import_transcript', $this->nonce_for( 'cpl_import_transcript' ) );
+
+		$this->dispatch();
+
+		$this->assertSame( array(), $this->dispatched_hooks() );
+	}
+
+	/**
+	 * A transcript import request without a nonce does not dispatch once the action is registered.
+	 */
+	public function test_transcript_import_without_nonce_dispatches_nothing() {
+		$this->set_user( true, array( 'edit_posts' ) );
+		$this->allow_actions( array( 'cpl_import_transcript' ) );
+		$this->set_request( 'cpl_import_transcript', null );
+
+		$this->dispatch();
+
+		$this->assertSame( array(), $this->dispatched_hooks() );
+	}
+
+	/**
+	 * An editor can run the transcript import action CP Library posts today.
+	 */
+	public function test_editor_can_run_legacy_transcript_import_without_core_nonce() {
+		$this->set_user( true, array( 'edit_posts' ) );
+		$this->set_request( 'cpl_import_transcript', null );
+
+		$this->dispatch();
+
+		$this->assertSame( array( 'cpl_import_transcript' ), $this->dispatched_hooks() );
+	}
+
+	/**
+	 * Other legacy actions still require manage_options.
+	 */
+	public function test_editor_cannot_run_other_legacy_actions() {
+		$this->set_user( true, array( 'edit_posts' ) );
+		$this->set_request( 'cp_export_items', null );
+
+		$this->dispatch();
+
+		$this->assertSame( array(), $this->dispatched_hooks() );
+	}
+
+	/**
 	 * The capability filter can grant a role other than the default.
 	 */
 	public function test_capability_filter_allows_a_user_who_has_the_filtered_capability() {

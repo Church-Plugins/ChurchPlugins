@@ -50,6 +50,9 @@ Practical consequences:
   `cpl_adapter_pull_sermon_audio`, `cpl_import_transcript`) available to a
   logged-in user with the required capability without the core nonce. Registering
   one of those names on `cp_request_actions` opts it into the nonce check.
+* `cpl_import_transcript` defaults to the `edit_posts` capability so an editor
+  can run the transcript import action. Other request actions still default to
+  `manage_options`. `cp_request_action_capability` can override either default.
 
 ### 1.1.18
 * Fix: `Models\Table::insert()`/`update()` retry a failed write without characters the

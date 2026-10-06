@@ -229,20 +229,39 @@ class _Init {
 		}
 
 		/**
-		 * Capability required to dispatch an allowlisted cp_action request.
+		 * Capability required to dispatch an allowlisted or legacy cp_action request.
+		 *
+		 * The default is `manage_options`, except `cpl_import_transcript`, which
+		 * defaults to `edit_posts` so an editor can run the transcript import action.
 		 *
 		 * @since 1.1.19
 		 *
-		 * @param string $capability Default manage_options.
+		 * @param string $capability Capability required for this action.
 		 * @param string $action     Requested action name.
 		 */
-		$capability = apply_filters( 'cp_request_action_capability', 'manage_options', $action );
+		$capability = apply_filters( 'cp_request_action_capability', self::default_request_action_capability( $action ), $action );
 
 		if ( ! is_string( $capability ) || '' === $capability ) {
 			return false;
 		}
 
 		return current_user_can( $capability );
+	}
+
+	/**
+	 * Default capability for a request action before filters run.
+	 *
+	 * @since 1.1.19
+	 *
+	 * @param string $action Requested action name.
+	 * @return string
+	 */
+	protected static function default_request_action_capability( $action ) {
+		if ( 'cpl_import_transcript' === $action ) {
+			return 'edit_posts';
+		}
+
+		return 'manage_options';
 	}
 
 	/**
