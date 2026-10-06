@@ -1,0 +1,6 @@
+# git archive (and GitHub's source download of this repo) omits the test
+# suite. Plugin release zips are built from a submodule checkout of this tree
+# and copy includes/**, so they follow the checkout, not export-ignore.
+/tests export-ignore
+/phpunit.xml.dist export-ignore
+/phpcs.xml.dist export-ignore
