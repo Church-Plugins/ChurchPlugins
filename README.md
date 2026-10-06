@@ -45,6 +45,11 @@ Practical consequences:
   `cp_public_request_actions`. `cp_send_email` (CP Groups) and `cp_staff_send_email`
   (CP Staff) are registered by default so those email forms keep working. Callbacks on
   that list must verify their own nonce.
+* `cp_legacy_request_actions` keeps the CP Library admin actions
+  (`cp_export_items`, `cpl_adapter_import_sermon_audio`,
+  `cpl_adapter_pull_sermon_audio`, `cpl_import_transcript`) available to a
+  logged-in user with the required capability without the core nonce. Registering
+  one of those names on `cp_request_actions` opts it into the nonce check.
 
 ### 1.1.18
 * Fix: `Models\Table::insert()`/`update()` retry a failed write without characters the

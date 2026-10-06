@@ -73,6 +73,11 @@ class _Init {
 	 * capability and a valid nonce from {@see self::request_action_nonce_field()}
 	 * or {@see self::request_action_nonce_url()}. Any other hook name is ignored.
 	 *
+	 * Names on `cp_legacy_request_actions` run for that same logged-in user
+	 * without the core nonce, so an older copy of CP Library keeps working.
+	 * Registering one of those names on `cp_request_actions` opts it into the
+	 * nonce check. The callback is responsible for its own nonce.
+	 *
 	 * A name registered on `cp_public_request_actions` is the opt-in for a
 	 * front-end form. That callback must verify its own nonce. Core does not
 	 * apply the capability check or the cp_action nonce to those names.
@@ -106,15 +111,20 @@ class _Init {
 			return;
 		}
 
-		if ( ! self::verify_request_action_nonce( $action ) ) {
+		// A name on the allowlist always requires the core nonce, including
+		// when that name is also on the legacy list.
+		if ( self::is_allowed_request_action( $action ) ) {
+			if ( ! self::verify_request_action_nonce( $action ) ) {
+				return;
+			}
+
+			do_action( $action, $vars );
 			return;
 		}
 
-		if ( ! self::is_allowed_request_action( $action ) ) {
-			return;
+		if ( self::is_legacy_request_action( $action ) ) {
+			do_action( $action, $vars );
 		}
-
-		do_action( $action, $vars );
 	}
 
 	/**
@@ -280,6 +290,45 @@ class _Init {
 		 * @param string[] $actions Registered action names. Default empty.
 		 */
 		$actions = apply_filters( 'cp_request_actions', array() );
+
+		return in_array( $action, self::normalize_action_list( $actions ), true );
+	}
+
+	/**
+	 * Whether this action is on the legacy list.
+	 *
+	 * These names dispatch for a logged-in user with the required capability
+	 * and do not require the core nonce. CP Library verifies its own nonce in
+	 * the callback once that plugin adopts one. A name that is also registered
+	 * on `cp_request_actions` is handled there and does require the core nonce.
+	 *
+	 * @since 1.1.19
+	 *
+	 * @param string $action Requested action name.
+	 * @return bool
+	 */
+	protected static function is_legacy_request_action( $action ) {
+		/**
+		 * Action names that dispatch for an authorized user without the core nonce.
+		 *
+		 * Defaults cover the CP Library admin screens that post `cp_action`
+		 * directly. Plugins can remove a name here once they register it on
+		 * `cp_request_actions` and send {@see self::request_action_nonce_field()}
+		 * or {@see self::request_action_nonce_url()}.
+		 *
+		 * @since 1.1.19
+		 *
+		 * @param string[] $actions Legacy action names.
+		 */
+		$actions = apply_filters(
+			'cp_legacy_request_actions',
+			array(
+				'cp_export_items',
+				'cpl_adapter_import_sermon_audio',
+				'cpl_adapter_pull_sermon_audio',
+				'cpl_import_transcript',
+			)
+		);
 
 		return in_array( $action, self::normalize_action_list( $actions ), true );
 	}

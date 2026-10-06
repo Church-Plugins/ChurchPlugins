@@ -75,8 +75,8 @@ class RequestActionsTest extends TestCase {
 	 */
 	public function test_missing_nonce_dispatches_nothing() {
 		$this->set_user( true, array( 'manage_options' ) );
-		$this->allow_actions( array( 'cp_export_items' ) );
-		$this->set_request( 'cp_export_items', null );
+		$this->allow_actions( array( 'cp_custom_tool' ) );
+		$this->set_request( 'cp_custom_tool', null );
 
 		$this->dispatch();
 
@@ -108,6 +108,54 @@ class RequestActionsTest extends TestCase {
 
 		$this->assertSame( array( 'cp_export_items' ), $this->dispatched_hooks() );
 		$this->assertSame( 'cp_export_items', $GLOBALS['cp_test_actions'][0]['arg']['cp_action'] );
+	}
+
+	/**
+	 * A legacy name dispatches for an admin with no nonce.
+	 */
+	public function test_legacy_action_dispatches_for_admin_without_nonce() {
+		$this->set_user( true, array( 'manage_options' ) );
+		$this->set_request( 'cp_export_items', null );
+
+		$this->dispatch();
+
+		$this->assertSame( array( 'cp_export_items' ), $this->dispatched_hooks() );
+	}
+
+	/**
+	 * A legacy name dispatches nothing for a logged-out visitor.
+	 */
+	public function test_legacy_action_dispatches_nothing_for_logged_out_visitor() {
+		$this->set_request( 'cpl_import_transcript', null );
+
+		$this->dispatch();
+
+		$this->assertSame( array(), $this->dispatched_hooks() );
+	}
+
+	/**
+	 * A legacy name dispatches nothing for a subscriber.
+	 */
+	public function test_legacy_action_dispatches_nothing_for_subscriber() {
+		$this->set_user( true, array( 'read' ) );
+		$this->set_request( 'cpl_adapter_import_sermon_audio', null );
+
+		$this->dispatch();
+
+		$this->assertSame( array(), $this->dispatched_hooks() );
+	}
+
+	/**
+	 * Registering a legacy name on the allowlist requires the core nonce.
+	 */
+	public function test_allowlisted_legacy_action_requires_nonce() {
+		$this->set_user( true, array( 'manage_options' ) );
+		$this->allow_actions( array( 'cp_export_items' ) );
+		$this->set_request( 'cp_export_items', null );
+
+		$this->dispatch();
+
+		$this->assertSame( array(), $this->dispatched_hooks() );
 	}
 
 	/**
