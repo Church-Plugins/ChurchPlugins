@@ -35,6 +35,7 @@ class RequestActionsTest extends TestCase {
 		$GLOBALS['cp_test_actions']      = array();
 		$GLOBALS['cp_test_filters']      = array();
 		$GLOBALS['cp_test_doing_action'] = array();
+		$GLOBALS['cp_test_json_error']   = null;
 		$GLOBALS['cp_test_user']         = array(
 			'logged_in' => false,
 			'caps'      => array(),
@@ -44,7 +45,7 @@ class RequestActionsTest extends TestCase {
 		$_POST    = array();
 		$_REQUEST = array();
 
-		unset( $_SERVER['HTTP_ORIGIN'], $_SERVER['HTTP_REFERER'] );
+		unset( $_SERVER['HTTP_ORIGIN'], $_SERVER['HTTP_REFERER'], $_SERVER['CONTENT_TYPE'], $_SERVER['HTTP_ACCEPT'] );
 		$_SERVER['REQUEST_METHOD'] = 'GET';
 
 		$GLOBALS['cp_test_home_url']  = 'https://example.test';
@@ -277,7 +278,7 @@ class RequestActionsTest extends TestCase {
 	 * An editor with a valid core nonce can run the transcript import action.
 	 */
 	public function test_editor_with_nonce_can_run_transcript_import() {
-		$this->set_user( true, array( 'edit_others_posts' ) );
+		$this->set_user( true, array( 'edit_posts', 'edit_others_posts' ) );
 		$this->allow_actions( array( 'cpl_import_transcript' ) );
 		$this->set_request( 'cpl_import_transcript', $this->nonce_for( 'cpl_import_transcript' ) );
 
@@ -303,7 +304,7 @@ class RequestActionsTest extends TestCase {
 	 * A transcript import request without a nonce does not dispatch once the action is registered.
 	 */
 	public function test_transcript_import_without_nonce_dispatches_nothing() {
-		$this->set_user( true, array( 'edit_others_posts' ) );
+		$this->set_user( true, array( 'edit_posts', 'edit_others_posts' ) );
 		$this->allow_actions( array( 'cpl_import_transcript' ) );
 		$this->set_request( 'cpl_import_transcript', null, 'POST' );
 		$this->set_referer( 'https://example.test/wp-admin/edit.php' );
@@ -317,7 +318,7 @@ class RequestActionsTest extends TestCase {
 	 * An editor can run the transcript import action CP Library posts today.
 	 */
 	public function test_editor_can_run_legacy_transcript_import_without_core_nonce() {
-		$this->set_user( true, array( 'edit_others_posts' ) );
+		$this->set_user( true, array( 'edit_posts', 'edit_others_posts' ) );
 		$this->set_request( 'cpl_import_transcript', null, 'POST' );
 		$this->set_referer( 'https://example.test/wp-admin/edit.php?post_type=cpl_item' );
 
@@ -327,16 +328,19 @@ class RequestActionsTest extends TestCase {
 	}
 
 	/**
-	 * A user who only has edit_posts cannot run the transcript import action.
+	 * An author can import a transcript for their own sermon.
+	 *
+	 * CP Library checks edit_post on the sermon. Requiring edit_others_posts
+	 * here blocked authors from a sermon they are allowed to edit.
 	 */
-	public function test_user_with_edit_posts_cannot_run_transcript_import() {
+	public function test_author_can_run_transcript_import() {
 		$this->set_user( true, array( 'edit_posts', 'edit_published_posts' ) );
 		$this->set_request( 'cpl_import_transcript', null, 'POST' );
 		$this->set_referer( 'https://example.test/wp-admin/post.php?post=10&action=edit' );
 
 		$this->dispatch();
 
-		$this->assertSame( array(), $this->dispatched_hooks() );
+		$this->assertSame( array( 'cpl_import_transcript' ), $this->dispatched_hooks() );
 	}
 
 	/**
@@ -525,7 +529,7 @@ class RequestActionsTest extends TestCase {
 			'export'              => array( 'cp_export_items', 'manage_options' ),
 			'import sermon audio' => array( 'cpl_adapter_import_sermon_audio', 'manage_options' ),
 			'pull sermon audio'   => array( 'cpl_adapter_pull_sermon_audio', 'manage_options' ),
-			'transcript'          => array( 'cpl_import_transcript', 'edit_others_posts' ),
+			'transcript'          => array( 'cpl_import_transcript', 'edit_posts' ),
 			'upload import file'  => array( 'cp_upload_import_file', 'manage_options' ),
 		);
 	}
@@ -651,6 +655,118 @@ class RequestActionsTest extends TestCase {
 	}
 
 	/**
+	 * A legacy POST with the plugin's _wpnonce runs without Origin or Referer.
+	 *
+	 * Under Referrer-Policy: no-referrer a browser sends Origin: null and no
+	 * Referer, so the same-site check refused every CP Library settings button
+	 * even though the request carried the nonce CP Library already sends.
+	 */
+	public function test_legacy_wpnonce_runs_without_site_headers() {
+		$this->set_user( true, array( 'manage_options' ) );
+		$this->set_request( 'cpl_adapter_pull_sermon_audio', null, 'POST' );
+		$this->set_wpnonce( wp_create_nonce( 'cpl_adapter_pull_sermon_audio' ) );
+		$this->set_origin( 'null' );
+
+		$this->dispatch();
+
+		$this->assertSame( array( 'cpl_adapter_pull_sermon_audio' ), $this->dispatched_hooks() );
+	}
+
+	/**
+	 * A _wpnonce created for another action does not run a legacy action.
+	 */
+	public function test_legacy_wpnonce_for_a_different_action_is_refused() {
+		$this->set_user( true, array( 'manage_options' ) );
+		$this->set_request( 'cp_export_items', null, 'POST' );
+		$this->set_wpnonce( wp_create_nonce( 'cpl_adapter_pull_sermon_audio' ) );
+
+		$this->dispatch();
+
+		$this->assertSame( array(), $this->dispatched_hooks() );
+	}
+
+	/**
+	 * A _wpnonce does not stand in for the core nonce on an allowlisted name.
+	 */
+	public function test_wpnonce_does_not_satisfy_allowlisted_action() {
+		$this->set_user( true, array( 'manage_options' ) );
+		$this->allow_actions( array( 'cp_export_items' ) );
+		$this->set_request( 'cp_export_items', null, 'POST' );
+		$this->set_wpnonce( wp_create_nonce( 'cp_export_items' ) );
+
+		$this->dispatch();
+
+		$this->assertSame( array(), $this->dispatched_hooks() );
+	}
+
+	/**
+	 * A refused JSON request gets a 403 JSON error instead of an empty body.
+	 *
+	 * The CP Library settings buttons parse the response as JSON. An empty
+	 * body surfaced as "Unexpected end of JSON input".
+	 */
+	public function test_refused_json_request_gets_json_error() {
+		$this->set_user( true, array( 'read' ) );
+		$this->set_request( 'cpl_adapter_pull_sermon_audio', null, 'POST' );
+		$_SERVER['CONTENT_TYPE'] = 'application/json';
+
+		$this->dispatch();
+
+		$this->assertSame( array(), $this->dispatched_hooks() );
+		$this->assertSame( 403, $GLOBALS['cp_test_json_error']['status'] );
+		$this->assertNotEmpty( $GLOBALS['cp_test_json_error']['data']['error'] );
+	}
+
+	/**
+	 * A refused request fires cp_request_action_refused with the reason.
+	 *
+	 * @dataProvider refusal_reasons
+	 *
+	 * @param string   $reason  Expected reason.
+	 * @param string[] $caps    Current user capabilities.
+	 * @param bool     $allowed Whether the action is on the allowlist.
+	 */
+	public function test_refused_request_reports_reason( $reason, $caps, $allowed ) {
+		$this->set_user( true, $caps );
+
+		if ( $allowed ) {
+			$this->allow_actions( array( 'cp_export_items' ) );
+		}
+
+		$this->set_request( 'cp_export_items', null, 'POST' );
+
+		$this->dispatch();
+
+		$this->assertSame( array( $reason ), $this->refused_reasons() );
+		$this->assertNull( $GLOBALS['cp_test_json_error'] );
+	}
+
+	/**
+	 * @return array[]
+	 */
+	public function refusal_reasons() {
+		return array(
+			'capability' => array( 'capability', array( 'read' ), false ),
+			'nonce'      => array( 'nonce', array( 'manage_options' ), true ),
+			'same site'  => array( 'same_site', array( 'manage_options' ), false ),
+		);
+	}
+
+	/**
+	 * An unregistered name is ignored without a refusal or a JSON error.
+	 */
+	public function test_unregistered_name_is_not_reported() {
+		$this->set_user( true, array( 'manage_options' ) );
+		$this->set_request( 'init', null, 'POST' );
+		$_SERVER['CONTENT_TYPE'] = 'application/json';
+
+		$this->dispatch();
+
+		$this->assertSame( array(), $this->refused_reasons() );
+		$this->assertNull( $GLOBALS['cp_test_json_error'] );
+	}
+
+	/**
 	 * @param string      $action Action name.
 	 * @param string|null $nonce  Nonce value, or null when the request has none.
 	 * @param string      $method Request method.
@@ -696,6 +812,38 @@ class RequestActionsTest extends TestCase {
 	 * @return string[]
 	 */
 	private function dispatched_hooks() {
-		return array_column( $GLOBALS['cp_test_actions'], 'hook' );
+		return array_values( array_diff( array_column( $GLOBALS['cp_test_actions'], 'hook' ), array( 'cp_request_action_refused' ) ) );
+	}
+
+	/**
+	 * Reasons passed to cp_request_action_refused, in order.
+	 *
+	 * @return string[]
+	 */
+	private function refused_reasons() {
+		$reasons = array();
+
+		foreach ( $GLOBALS['cp_test_actions'] as $call ) {
+			if ( 'cp_request_action_refused' === $call['hook'] ) {
+				$reasons[] = $call['args'][1];
+			}
+		}
+
+		return $reasons;
+	}
+
+	/**
+	 * Put a _wpnonce on the current request.
+	 *
+	 * @param string $nonce Nonce value.
+	 */
+	private function set_wpnonce( $nonce ) {
+		$_REQUEST['_wpnonce'] = $nonce;
+
+		if ( 'POST' === $_SERVER['REQUEST_METHOD'] ) {
+			$_POST['_wpnonce'] = $nonce;
+		} else {
+			$_GET['_wpnonce'] = $nonce;
+		}
 	}
 }

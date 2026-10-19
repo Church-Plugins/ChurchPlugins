@@ -74,14 +74,18 @@ class _Init {
 	 * or {@see self::request_action_nonce_url()}. Any other hook name is ignored.
 	 *
 	 * Names on `cp_legacy_request_actions` run for that same logged-in user
-	 * when the request carries a valid core nonce for the action, on any
-	 * request method. Without that nonce the request must be POST and
-	 * same-site. Same-site means the Origin header, or the Referer when
-	 * Origin is absent, has the same scheme, host, and port as
-	 * {@see home_url()} or {@see admin_url()}. A GET or HEAD, missing
-	 * headers, or a different scheme, host, or port does not run.
-	 * Registering one of those names on `cp_request_actions` opts it into
-	 * the nonce check and does not fall through to the legacy list.
+	 * when the request carries a valid core nonce for the action, or a
+	 * `_wpnonce` created for the action name, on any request method. Without
+	 * either nonce the request must be POST and same-site. Same-site means the
+	 * Origin header, or the Referer when Origin is absent, has the same
+	 * scheme, host, and port as {@see home_url()} or {@see admin_url()}. A GET
+	 * or HEAD, missing headers, or a different scheme, host, or port does not
+	 * run. Registering one of those names on `cp_request_actions` opts it
+	 * into the core nonce check and does not fall through to the legacy list.
+	 *
+	 * A refused request for a registered name fires `cp_request_action_refused`.
+	 * A JSON request also gets a 403 JSON error. Unregistered names are ignored
+	 * without either.
 	 *
 	 * A name registered on `cp_public_request_actions` is the opt-in for a
 	 * front-end form. That callback must verify its own nonce. Core does not
@@ -112,14 +116,22 @@ class _Init {
 			return;
 		}
 
-		if ( ! self::user_can_request_action( $action ) ) {
+		// A name on the allowlist always requires the core nonce, including
+		// when that name is also on the legacy list.
+		$is_allowed = self::is_allowed_request_action( $action );
+
+		if ( ! $is_allowed && ! self::is_legacy_request_action( $action ) ) {
 			return;
 		}
 
-		// A name on the allowlist always requires the core nonce, including
-		// when that name is also on the legacy list.
-		if ( self::is_allowed_request_action( $action ) ) {
+		if ( ! self::user_can_request_action( $action ) ) {
+			self::refuse_request_action( $action, 'capability' );
+			return;
+		}
+
+		if ( $is_allowed ) {
 			if ( ! self::verify_request_action_nonce( $action ) ) {
+				self::refuse_request_action( $action, 'nonce' );
 				return;
 			}
 
@@ -127,9 +139,65 @@ class _Init {
 			return;
 		}
 
-		if ( self::is_legacy_request_action( $action ) && self::legacy_request_may_run( $action ) ) {
-			do_action( $action, $vars );
+		if ( ! self::legacy_request_may_run( $action ) ) {
+			self::refuse_request_action( $action, 'same_site' );
+			return;
 		}
+
+		do_action( $action, $vars );
+	}
+
+	/**
+	 * Report a refused request for a registered action name.
+	 *
+	 * Without this the request ends with an empty response, which the admin
+	 * buttons that post `cp_action` cannot tell apart from a broken handler.
+	 *
+	 * @since 1.1.19
+	 *
+	 * @param string $action Requested action name.
+	 * @param string $reason `capability`, `nonce`, or `same_site`.
+	 * @return void
+	 */
+	protected static function refuse_request_action( $action, $reason ) {
+		/**
+		 * Fires when a request for a registered cp_action name is refused.
+		 *
+		 * @since 1.1.19
+		 *
+		 * @param string $action Requested action name.
+		 * @param string $reason `capability`, `nonce`, or `same_site`.
+		 */
+		do_action( 'cp_request_action_refused', $action, $reason );
+
+		if ( ! self::request_wants_json() ) {
+			return;
+		}
+
+		// `error` matches the shape the CP Library settings buttons read.
+		wp_send_json_error(
+			array(
+				'error' => __( 'You are not allowed to do that, or the page has expired. Reload the page and try again.', 'church-plugins' ),
+			),
+			403
+		);
+	}
+
+	/**
+	 * Whether the request was sent as JSON or asks for a JSON response.
+	 *
+	 * @since 1.1.19
+	 *
+	 * @return bool
+	 */
+	protected static function request_wants_json() {
+		foreach ( array( 'CONTENT_TYPE', 'HTTP_ACCEPT' ) as $header ) {
+			if ( isset( $_SERVER[ $header ] ) && is_string( $_SERVER[ $header ] ) && false !== stripos( $_SERVER[ $header ], 'application/json' ) ) { // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Only searched for a fixed substring.
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
@@ -245,7 +313,8 @@ class _Init {
 		 * Capability required to dispatch an allowlisted or legacy cp_action request.
 		 *
 		 * The default is `manage_options`, except `cpl_import_transcript`, which
-		 * defaults to `edit_others_posts` so an editor can run the transcript import action.
+		 * defaults to `edit_posts`. CP Library checks `edit_post` on the sermon
+		 * itself, so an author can import a transcript for their own sermon.
 		 *
 		 * @since 1.1.19
 		 *
@@ -271,7 +340,7 @@ class _Init {
 	 */
 	protected static function default_request_action_capability( $action ) {
 		if ( 'cpl_import_transcript' === $action ) {
-			return 'edit_others_posts';
+			return 'edit_posts';
 		}
 
 		return 'manage_options';
@@ -295,6 +364,31 @@ class _Init {
 		}
 
 		return (bool) wp_verify_nonce( $nonce, self::request_action_nonce_action( $action ) );
+	}
+
+	/**
+	 * Whether the request carries a `_wpnonce` created for the bare action name.
+	 *
+	 * CP Library 1.8.0 and CP Sync send `wp_create_nonce( $action )` as
+	 * `_wpnonce` with their own buttons. Accepting it lets those requests run
+	 * without relying on the Origin or Referer header, which browsers omit
+	 * under `Referrer-Policy: no-referrer`. Only legacy names use this.
+	 *
+	 * @since 1.1.19
+	 *
+	 * @param string $action Requested action name.
+	 * @return bool
+	 */
+	protected static function verify_legacy_wpnonce( $action ) {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- This method is the nonce check.
+		if ( ! isset( $_REQUEST['_wpnonce'] ) || ! is_string( $_REQUEST['_wpnonce'] ) ) {
+			return false;
+		}
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$nonce = sanitize_text_field( wp_unslash( $_REQUEST['_wpnonce'] ) );
+
+		return (bool) wp_verify_nonce( $nonce, $action );
 	}
 
 	/**
@@ -342,7 +436,8 @@ class _Init {
 	protected static function is_legacy_request_action( $action ) {
 		/**
 		 * Action names that dispatch for an authorized user when the request
-		 * carries a valid core nonce, or is a same-site POST.
+		 * carries a valid core nonce or a `_wpnonce` for the action name, or is
+		 * a same-site POST.
 		 *
 		 * Defaults cover the CP Library admin screens that post `cp_action`
 		 * directly, including `cp_upload_import_file` for the CSV import on
@@ -372,8 +467,9 @@ class _Init {
 	/**
 	 * Whether a legacy action may run for this request.
 	 *
-	 * A valid core nonce for the action is enough on its own, for any request
-	 * method. Without that nonce the request must be POST, and then same-site.
+	 * A valid core nonce for the action, or a `_wpnonce` created for the
+	 * action name, is enough on its own, for any request method. Without
+	 * either nonce the request must be POST, and then same-site.
 	 * Same-site means the Origin header, or the Referer when Origin is absent,
 	 * has the same scheme, host, and port as {@see home_url()} or
 	 * {@see admin_url()}. A GET or HEAD is refused before that comparison.
@@ -386,7 +482,7 @@ class _Init {
 	 * @return bool
 	 */
 	protected static function legacy_request_may_run( $action ) {
-		if ( self::verify_request_action_nonce( $action ) ) {
+		if ( self::verify_request_action_nonce( $action ) || self::verify_legacy_wpnonce( $action ) ) {
 			return true;
 		}
 

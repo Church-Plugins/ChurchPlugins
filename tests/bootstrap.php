@@ -247,6 +247,34 @@ if ( ! function_exists( 'do_action' ) ) {
 		$GLOBALS['cp_test_actions'][] = array(
 			'hook' => $hook,
 			'arg'  => $arg,
+			'args' => array_slice( func_get_args(), 1 ),
+		);
+	}
+}
+
+if ( ! function_exists( '__' ) ) {
+	/**
+	 * @param string $text   Text to translate.
+	 * @param string $domain Text domain.
+	 * @return string
+	 */
+	function __( $text, $domain = 'default' ) {
+		return $text;
+	}
+}
+
+if ( ! function_exists( 'wp_send_json_error' ) ) {
+	/**
+	 * Records the response instead of printing it and exiting.
+	 *
+	 * @param mixed $data        Response data.
+	 * @param int   $status_code HTTP status code.
+	 * @return void
+	 */
+	function wp_send_json_error( $data = null, $status_code = null ) {
+		$GLOBALS['cp_test_json_error'] = array(
+			'data'   => $data,
+			'status' => $status_code,
 		);
 	}
 }

@@ -51,17 +51,28 @@ Practical consequences:
 * `cp_legacy_request_actions` keeps the CP Library admin actions
   (`cp_export_items`, `cpl_adapter_import_sermon_audio`,
   `cpl_adapter_pull_sermon_audio`, `cpl_import_transcript`, `cp_upload_import_file`)
-  available to a logged-in user with the required capability. A valid core nonce
-  authorizes the action on any request method. Without that nonce the request
-  must be POST and same-site. Same-site means the Origin header, or the Referer
+  available to a logged-in user with the required capability. A valid core nonce,
+  or a `_wpnonce` created for the action name (what CP Library 1.8.0 and CP Sync
+  already send), authorizes the action on any request method. Without either
+  nonce the request must be POST and same-site. Same-site means the Origin header, or the Referer
   when Origin is absent, has the same scheme, host, and port as `home_url()` or
   `admin_url()`. A GET or HEAD, missing headers, or a different scheme, host, or
   port does not run. Registering one of those names on `cp_request_actions` opts
   it into the nonce check. `cp_upload_import_file` is the CSV upload used by older
   CP Library releases.
-* `cpl_import_transcript` defaults to the `edit_others_posts` capability so an editor
-  can run the transcript import action. Other request actions still default to
-  `manage_options`. `cp_request_action_capability` can override either default.
+* `cpl_import_transcript` defaults to the `edit_posts` capability. CP Library checks
+  `edit_post` on the sermon, so an author can import a transcript for their own sermon.
+  Other request actions still default to `manage_options`.
+  `cp_request_action_capability` can override either default.
+* A refused request for a registered name fires `cp_request_action_refused` with the
+  action and a reason (`capability`, `nonce`, or `same_site`). A JSON request also gets
+  a 403 `wp_send_json_error( array( 'error' => ... ) )` instead of an empty response.
+  Unregistered names are still ignored silently.
+* Tests: PHPUnit lives in `tests/composer.json`, apart from the root `composer.json`, so
+  installing it never rewrites the production autoloader under `vendor/`. Run
+  `composer install && composer test` from `tests/`. Do this in a standalone clone, not
+  inside a plugin's `includes/ChurchPlugins` submodule: plugin zips copy `includes/**`,
+  and `tests/vendor/` would ship with them.
 
 ### 1.1.18
 * Fix: `Models\Table::insert()`/`update()` retry a failed write without characters the
