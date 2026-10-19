@@ -60,10 +60,13 @@ Practical consequences:
   port does not run. Registering one of those names on `cp_request_actions` opts
   it into the nonce check. `cp_upload_import_file` is the CSV upload used by older
   CP Library releases.
-* `cpl_import_transcript` defaults to the `edit_posts` capability. CP Library checks
-  `edit_post` on the sermon, so an author can import a transcript for their own sermon.
-  Other request actions still default to `manage_options`.
-  `cp_request_action_capability` can override either default.
+* `cpl_import_transcript` is checked as `edit_post` against the requested `post_id`, so
+  an author can import a transcript for their own sermon and not for anyone else's. A
+  request without a `post_id` does not run. CP Library releases before 1.8.0 do no
+  check of their own, so this has to happen in the dispatcher. Other request actions
+  still default to `manage_options`. `cp_request_action_capability` can override either
+  default; for the transcript import the filtered capability is still checked against
+  the sermon.
 * A refused request for a registered name fires `cp_request_action_refused` with the
   action and a reason (`capability`, `nonce`, or `same_site`). A JSON request also gets
   a 403 `wp_send_json_error( array( 'error' => ... ) )` instead of an empty response.

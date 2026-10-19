@@ -64,12 +64,31 @@ if ( ! function_exists( 'is_user_logged_in' ) ) {
 
 if ( ! function_exists( 'current_user_can' ) ) {
 	/**
-	 * @param string $cap Capability name.
+	 * `edit_post` with a post ID is granted by an `edit_post:<id>` entry in the
+	 * test user's caps. Other capabilities ignore the extra arguments.
+	 *
+	 * @param string $cap     Capability name.
+	 * @param mixed  ...$args Object IDs for a meta capability.
 	 * @return bool
 	 */
-	function current_user_can( $cap ) {
+	function current_user_can( $cap, ...$args ) {
 		$caps = isset( $GLOBALS['cp_test_user']['caps'] ) ? $GLOBALS['cp_test_user']['caps'] : array();
+
+		if ( 'edit_post' === $cap ) {
+			return isset( $args[0] ) && in_array( 'edit_post:' . $args[0], $caps, true );
+		}
+
 		return in_array( $cap, $caps, true );
+	}
+}
+
+if ( ! function_exists( 'absint' ) ) {
+	/**
+	 * @param mixed $maybeint Value to convert.
+	 * @return int
+	 */
+	function absint( $maybeint ) {
+		return abs( (int) $maybeint );
 	}
 }
 

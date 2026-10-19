@@ -278,7 +278,7 @@ class RequestActionsTest extends TestCase {
 	 * An editor with a valid core nonce can run the transcript import action.
 	 */
 	public function test_editor_with_nonce_can_run_transcript_import() {
-		$this->set_user( true, array( 'edit_posts', 'edit_others_posts' ) );
+		$this->set_user( true, array( 'edit_posts', 'edit_others_posts', 'edit_post:10' ) );
 		$this->allow_actions( array( 'cpl_import_transcript' ) );
 		$this->set_request( 'cpl_import_transcript', $this->nonce_for( 'cpl_import_transcript' ) );
 
@@ -304,7 +304,7 @@ class RequestActionsTest extends TestCase {
 	 * A transcript import request without a nonce does not dispatch once the action is registered.
 	 */
 	public function test_transcript_import_without_nonce_dispatches_nothing() {
-		$this->set_user( true, array( 'edit_posts', 'edit_others_posts' ) );
+		$this->set_user( true, array( 'edit_posts', 'edit_others_posts', 'edit_post:10' ) );
 		$this->allow_actions( array( 'cpl_import_transcript' ) );
 		$this->set_request( 'cpl_import_transcript', null, 'POST' );
 		$this->set_referer( 'https://example.test/wp-admin/edit.php' );
@@ -318,7 +318,7 @@ class RequestActionsTest extends TestCase {
 	 * An editor can run the transcript import action CP Library posts today.
 	 */
 	public function test_editor_can_run_legacy_transcript_import_without_core_nonce() {
-		$this->set_user( true, array( 'edit_posts', 'edit_others_posts' ) );
+		$this->set_user( true, array( 'edit_posts', 'edit_others_posts', 'edit_post:10' ) );
 		$this->set_request( 'cpl_import_transcript', null, 'POST' );
 		$this->set_referer( 'https://example.test/wp-admin/edit.php?post_type=cpl_item' );
 
@@ -330,17 +330,49 @@ class RequestActionsTest extends TestCase {
 	/**
 	 * An author can import a transcript for their own sermon.
 	 *
-	 * CP Library checks edit_post on the sermon. Requiring edit_others_posts
-	 * here blocked authors from a sermon they are allowed to edit.
+	 * Requiring edit_others_posts blocked authors from a sermon they are
+	 * allowed to edit.
 	 */
-	public function test_author_can_run_transcript_import() {
-		$this->set_user( true, array( 'edit_posts', 'edit_published_posts' ) );
+	public function test_author_can_run_transcript_import_for_own_sermon() {
+		$this->set_user( true, array( 'edit_posts', 'edit_published_posts', 'edit_post:10' ) );
 		$this->set_request( 'cpl_import_transcript', null, 'POST' );
 		$this->set_referer( 'https://example.test/wp-admin/post.php?post=10&action=edit' );
 
 		$this->dispatch();
 
 		$this->assertSame( array( 'cpl_import_transcript' ), $this->dispatched_hooks() );
+	}
+
+	/**
+	 * An author cannot import a transcript for someone else's sermon.
+	 *
+	 * CP Library releases before 1.8.0 do no capability check in the
+	 * transcript handler. A role-level edit_posts check here would have let
+	 * any author or contributor overwrite the transcript on any sermon.
+	 */
+	public function test_author_cannot_run_transcript_import_for_another_sermon() {
+		$this->set_user( true, array( 'edit_posts', 'edit_published_posts', 'edit_post:11' ) );
+		$this->set_request( 'cpl_import_transcript', null, 'POST' );
+		$this->set_referer( 'https://example.test/wp-admin/edit.php?post_type=cpl_item' );
+
+		$this->dispatch();
+
+		$this->assertSame( array(), $this->dispatched_hooks() );
+		$this->assertSame( array( 'capability' ), $this->refused_reasons() );
+	}
+
+	/**
+	 * A transcript import without a post_id does not dispatch.
+	 */
+	public function test_transcript_import_without_post_id_dispatches_nothing() {
+		$this->set_user( true, array( 'manage_options', 'edit_posts', 'edit_others_posts', 'edit_post:10' ) );
+		$this->set_request( 'cpl_import_transcript', null, 'POST' );
+		unset( $_REQUEST['post_id'], $_POST['post_id'] );
+		$this->set_referer( 'https://example.test/wp-admin/edit.php?post_type=cpl_item' );
+
+		$this->dispatch();
+
+		$this->assertSame( array(), $this->dispatched_hooks() );
 	}
 
 	/**
@@ -529,7 +561,7 @@ class RequestActionsTest extends TestCase {
 			'export'              => array( 'cp_export_items', 'manage_options' ),
 			'import sermon audio' => array( 'cpl_adapter_import_sermon_audio', 'manage_options' ),
 			'pull sermon audio'   => array( 'cpl_adapter_pull_sermon_audio', 'manage_options' ),
-			'transcript'          => array( 'cpl_import_transcript', 'edit_posts' ),
+			'transcript'          => array( 'cpl_import_transcript', 'edit_post:10' ),
 			'upload import file'  => array( 'cp_upload_import_file', 'manage_options' ),
 		);
 	}
@@ -775,6 +807,11 @@ class RequestActionsTest extends TestCase {
 		$query = array(
 			'cp_action' => $action,
 		);
+
+		// The transcript import is checked against one sermon.
+		if ( 'cpl_import_transcript' === $action ) {
+			$query['post_id'] = '10';
+		}
 
 		if ( null !== $nonce ) {
 			$query[ _Init::REQUEST_ACTION_NONCE_ARG ] = $nonce;

@@ -313,8 +313,10 @@ class _Init {
 		 * Capability required to dispatch an allowlisted or legacy cp_action request.
 		 *
 		 * The default is `manage_options`, except `cpl_import_transcript`, which
-		 * defaults to `edit_posts`. CP Library checks `edit_post` on the sermon
-		 * itself, so an author can import a transcript for their own sermon.
+		 * defaults to `edit_post` checked against the requested `post_id`. An
+		 * author can import a transcript for their own sermon and not for
+		 * anyone else's. CP Library releases before 1.8.0 do no check of
+		 * their own, so the per-sermon check has to happen here.
 		 *
 		 * @since 1.1.19
 		 *
@@ -327,7 +329,19 @@ class _Init {
 			return false;
 		}
 
-		return current_user_can( $capability );
+		if ( 'cpl_import_transcript' !== $action ) {
+			return current_user_can( $capability );
+		}
+
+		// The transcript import writes to one sermon, so the check is always
+		// made against that sermon, including for a filtered capability.
+		$post_id = self::requested_post_id();
+
+		if ( ! $post_id ) {
+			return false;
+		}
+
+		return current_user_can( $capability, $post_id );
 	}
 
 	/**
@@ -340,10 +354,27 @@ class _Init {
 	 */
 	protected static function default_request_action_capability( $action ) {
 		if ( 'cpl_import_transcript' === $action ) {
-			return 'edit_posts';
+			return 'edit_post';
 		}
 
 		return 'manage_options';
+	}
+
+	/**
+	 * Post ID from the current request, or 0.
+	 *
+	 * @since 1.1.19
+	 *
+	 * @return int
+	 */
+	protected static function requested_post_id() {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read for the capability check. The nonce is checked separately.
+		if ( ! isset( $_REQUEST['post_id'] ) || ! is_scalar( $_REQUEST['post_id'] ) ) {
+			return 0;
+		}
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		return absint( wp_unslash( $_REQUEST['post_id'] ) );
 	}
 
 	/**
