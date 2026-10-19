@@ -45,7 +45,7 @@ class RequestActionsTest extends TestCase {
 		$_POST    = array();
 		$_REQUEST = array();
 
-		unset( $_SERVER['HTTP_ORIGIN'], $_SERVER['HTTP_REFERER'], $_SERVER['CONTENT_TYPE'], $_SERVER['HTTP_ACCEPT'] );
+		unset( $_SERVER['HTTP_ORIGIN'], $_SERVER['HTTP_REFERER'], $_SERVER['HTTP_SEC_FETCH_SITE'], $_SERVER['CONTENT_TYPE'], $_SERVER['HTTP_ACCEPT'] );
 		$_SERVER['REQUEST_METHOD'] = 'GET';
 
 		$GLOBALS['cp_test_home_url']  = 'https://example.test';
@@ -840,6 +840,181 @@ class RequestActionsTest extends TestCase {
 
 		$this->assertSame( array(), $this->refused_reasons() );
 		$this->assertNull( $GLOBALS['cp_test_json_error'] );
+	}
+
+	/**
+	 * Sec-Fetch-Site: same-origin runs a legacy POST when Origin is null.
+	 *
+	 * Under Referrer-Policy: no-referrer a same-origin POST carries
+	 * Origin: null and no Referer, so every nonce-less legacy action was
+	 * refused. Sec-Fetch-Site is still sent and cannot be set by a page.
+	 */
+	public function test_same_origin_fetch_site_runs_legacy_action_without_referer() {
+		$this->set_user( true, array( 'manage_options' ) );
+		$this->set_request( 'cp_export_items', null, 'POST' );
+		$this->set_origin( 'null' );
+		$_SERVER['HTTP_SEC_FETCH_SITE'] = 'same-origin';
+
+		$this->dispatch();
+
+		$this->assertSame( array( 'cp_export_items' ), $this->dispatched_hooks() );
+	}
+
+	/**
+	 * Sec-Fetch-Site other than same-origin refuses, even with a matching Referer.
+	 *
+	 * @dataProvider other_fetch_sites
+	 *
+	 * @param string $fetch_site Sec-Fetch-Site value.
+	 */
+	public function test_other_fetch_site_refuses_legacy_action( $fetch_site ) {
+		$this->set_user( true, array( 'manage_options' ) );
+		$this->set_request( 'cp_export_items', null, 'POST' );
+		$this->set_referer( 'https://example.test/wp-admin/tools.php' );
+		$_SERVER['HTTP_SEC_FETCH_SITE'] = $fetch_site;
+
+		$this->dispatch();
+
+		$this->assertSame( array(), $this->dispatched_hooks() );
+	}
+
+	/**
+	 * @return array[]
+	 */
+	public function other_fetch_sites() {
+		return array(
+			'cross-site' => array( 'cross-site' ),
+			'same-site'  => array( 'same-site' ),
+			'none'       => array( 'none' ),
+		);
+	}
+
+	/**
+	 * Origin: null refuses and does not fall back to a matching Referer.
+	 */
+	public function test_null_origin_does_not_fall_back_to_referer() {
+		$this->set_user( true, array( 'manage_options' ) );
+		$this->set_request( 'cp_export_items', null, 'POST' );
+		$this->set_origin( 'null' );
+		$this->set_referer( 'https://example.test/wp-admin/tools.php' );
+
+		$this->dispatch();
+
+		$this->assertSame( array(), $this->dispatched_hooks() );
+	}
+
+	/**
+	 * An Origin or Referer with user info does not match, whatever host it ends in.
+	 *
+	 * PHP parses https://evil.com\@example.test as host example.test, while
+	 * a browser would treat it as evil.com.
+	 *
+	 * @dataProvider userinfo_urls
+	 *
+	 * @param string $header Header name.
+	 * @param string $url    Header value as the browser sent it.
+	 */
+	public function test_url_with_userinfo_does_not_match_site( $header, $url ) {
+		$this->set_user( true, array( 'manage_options' ) );
+		$this->set_request( 'cp_export_items', null, 'POST' );
+		// WordPress slashes $_SERVER in wp_magic_quotes().
+		$_SERVER[ $header ] = addslashes( $url );
+
+		$this->dispatch();
+
+		$this->assertSame( array(), $this->dispatched_hooks() );
+	}
+
+	/**
+	 * @return array[]
+	 */
+	public function userinfo_urls() {
+		return array(
+			'backslash origin' => array( 'HTTP_ORIGIN', 'https://evil.com\@example.test' ),
+			'user origin'      => array( 'HTTP_ORIGIN', 'https://evil.com@example.test' ),
+			'user referer'     => array( 'HTTP_REFERER', 'https://user:pass@example.test/wp-admin/' ),
+		);
+	}
+
+	/**
+	 * The per-sermon transcript nonce CP Library 1.8.0 sends runs without site headers.
+	 */
+	public function test_transcript_wpnonce_for_the_sermon_runs_without_site_headers() {
+		$this->set_user( true, array( 'edit_posts', 'edit_post:10' ) );
+		$this->set_request( 'cpl_import_transcript', null, 'POST' );
+		$this->set_wpnonce( wp_create_nonce( 'cpl_import_transcript_10' ) );
+		$this->set_origin( 'null' );
+
+		$this->dispatch();
+
+		$this->assertSame( array( 'cpl_import_transcript' ), $this->dispatched_hooks() );
+	}
+
+	/**
+	 * A transcript nonce for another sermon does not stand in for this one.
+	 */
+	public function test_transcript_wpnonce_for_another_sermon_is_refused() {
+		$this->set_user( true, array( 'edit_posts', 'edit_post:10', 'edit_post:11' ) );
+		$this->set_request( 'cpl_import_transcript', null, 'POST' );
+		$this->set_wpnonce( wp_create_nonce( 'cpl_import_transcript_11' ) );
+		$this->set_origin( 'null' );
+
+		$this->dispatch();
+
+		$this->assertSame( array(), $this->dispatched_hooks() );
+	}
+
+	/**
+	 * A post_id sent as an array is refused.
+	 */
+	public function test_transcript_import_with_array_post_id_is_refused() {
+		// absint( array( '10' ) ) is 1, so the user can edit post 1 as well.
+		$this->set_user( true, array( 'edit_posts', 'edit_post:1', 'edit_post:10' ) );
+		$this->set_referer( 'https://example.test/wp-admin/edit.php?post_type=cpl_item' );
+		$_SERVER['REQUEST_METHOD'] = 'POST';
+		$_GET     = array(
+			'cp_action' => 'cpl_import_transcript',
+			'post_id'   => array( '10' ),
+		);
+		$_POST    = array();
+		$_REQUEST = $_GET;
+
+		$this->dispatch();
+
+		$this->assertSame( array(), $this->dispatched_hooks() );
+	}
+
+	/**
+	 * The request shape every real caller uses: cp_action and the nonce in the
+	 * query string, a POST body, and the callback passed the query string.
+	 */
+	public function test_query_string_action_with_post_body_runs_and_passes_query_vars() {
+		$this->set_user( true, array( 'manage_options' ) );
+		$_SERVER['REQUEST_METHOD'] = 'POST';
+		$_GET     = array(
+			'cp_action' => 'cpl_adapter_pull_sermon_audio',
+			'_wpnonce'  => wp_create_nonce( 'cpl_adapter_pull_sermon_audio' ),
+		);
+		$_POST    = array( 'unrelated' => 'value' );
+		$_REQUEST = array_merge( $_GET, $_POST );
+
+		$this->dispatch();
+
+		$this->assertSame( array( 'cpl_adapter_pull_sermon_audio' ), $this->dispatched_hooks() );
+		$this->assertSame( $_GET, $GLOBALS['cp_test_actions'][0]['arg'] );
+	}
+
+	/**
+	 * A refused request that asks for JSON through Accept gets the JSON error.
+	 */
+	public function test_refused_request_accepting_json_gets_json_error() {
+		$this->set_user( true, array( 'read' ) );
+		$this->set_request( 'cp_export_items', null, 'POST' );
+		$_SERVER['HTTP_ACCEPT'] = 'application/json, text/plain, */*';
+
+		$this->dispatch();
+
+		$this->assertSame( 403, $GLOBALS['cp_test_json_error']['status'] );
 	}
 
 	/**

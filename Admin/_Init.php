@@ -415,12 +415,14 @@ class _Init {
 	}
 
 	/**
-	 * Whether the request carries a `_wpnonce` created for the bare action name.
+	 * Whether the request carries the `_wpnonce` CP Library sends for this action.
 	 *
-	 * CP Library 1.8.0 and CP Sync send `wp_create_nonce( $action )` as
-	 * `_wpnonce` with their own buttons. Accepting it lets those requests run
-	 * without relying on the Origin or Referer header, which browsers omit
-	 * under `Referrer-Policy: no-referrer`. Only legacy names use this.
+	 * CP Library 1.8.0 sends `wp_create_nonce( $action )` as `_wpnonce` with
+	 * the export form and the SermonAudio buttons, and
+	 * `wp_create_nonce( 'cpl_import_transcript_' . $post_id )` with the
+	 * transcript buttons. Accepting them lets those requests run without the
+	 * same-site headers, which a browser withholds under
+	 * `Referrer-Policy: no-referrer`. Only legacy names use this.
 	 *
 	 * @since 1.1.19
 	 *
@@ -436,7 +438,21 @@ class _Init {
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		$nonce = sanitize_text_field( wp_unslash( $_REQUEST['_wpnonce'] ) );
 
-		return (bool) wp_verify_nonce( $nonce, $action );
+		$nonce_action = $action;
+
+		// The transcript nonce is bound to one sermon, the same one the
+		// capability check used.
+		if ( 'cpl_import_transcript' === $action ) {
+			$post_id = self::requested_post_id();
+
+			if ( ! $post_id ) {
+				return false;
+			}
+
+			$nonce_action = 'cpl_import_transcript_' . $post_id;
+		}
+
+		return (bool) wp_verify_nonce( $nonce, $nonce_action );
 	}
 
 	/**
@@ -484,8 +500,8 @@ class _Init {
 	protected static function is_legacy_request_action( $action ) {
 		/**
 		 * Action names that dispatch for an authorized user when the request
-		 * carries a valid core nonce or a `_wpnonce` for the action name, or is
-		 * a same-site POST.
+		 * carries a valid core nonce or the `_wpnonce` CP Library sends for the
+		 * action, or is a same-site POST.
 		 *
 		 * Defaults cover the CP Library admin screens that post `cp_action`
 		 * directly, including `cp_upload_import_file` for the CSV import on
@@ -515,14 +531,11 @@ class _Init {
 	/**
 	 * Whether a legacy action may run for this request.
 	 *
-	 * A valid core nonce for the action, or a `_wpnonce` created for the
-	 * action name, is enough on its own, for any request method. Without
-	 * either nonce the request must be POST, and then same-site.
-	 * Same-site means the Origin header, or the Referer when Origin is absent,
-	 * has the same scheme, host, and port as {@see home_url()} or
-	 * {@see admin_url()}. A GET or HEAD is refused before that comparison.
-	 * Missing headers, or a different scheme, host, or port, also refuse the
-	 * request.
+	 * A valid core nonce for the action, or the `_wpnonce` CP Library sends
+	 * for it (see {@see self::verify_legacy_wpnonce()}), is enough on its
+	 * own, for any request method. Without either nonce the request must be
+	 * POST, and then same-site (see {@see self::request_is_same_site()}). A
+	 * GET or HEAD is refused before that check.
 	 *
 	 * @since 1.1.19
 	 *
@@ -557,16 +570,28 @@ class _Init {
 	}
 
 	/**
-	 * Whether Origin, or Referer when Origin is absent, matches this site.
+	 * Whether the browser reports this request as coming from this site.
 	 *
-	 * Scheme, host, and port are all compared. An omitted port uses the
-	 * scheme default (80 for http, 443 for https).
+	 * `Sec-Fetch-Site` decides when it is present: only `same-origin`
+	 * passes. Browsers set it themselves, page scripts cannot change it, and
+	 * it is sent under `Referrer-Policy: no-referrer`, when Origin is `null`
+	 * and there is no Referer. Without it, the Origin header, or the Referer
+	 * when Origin is absent, must have the same scheme, host, and port as
+	 * {@see home_url()} or {@see admin_url()}. An omitted port uses the
+	 * scheme default (80 for http, 443 for https). `Origin: null` does not
+	 * match and does not fall back to the Referer.
 	 *
 	 * @since 1.1.19
 	 *
 	 * @return bool
 	 */
 	protected static function request_is_same_site() {
+		$fetch_site = self::request_header( 'HTTP_SEC_FETCH_SITE' );
+
+		if ( '' !== $fetch_site ) {
+			return 'same-origin' === strtolower( $fetch_site );
+		}
+
 		$origin = self::request_header( 'HTTP_ORIGIN' );
 
 		if ( '' !== $origin ) {
@@ -609,7 +634,9 @@ class _Init {
 	 * Scheme, host, and port for a URL, or null when the URL has no scheme or host.
 	 *
 	 * Host and scheme are lowercase. An omitted port becomes 80 or 443 for
-	 * http and https.
+	 * http and https. A URL with user info or a backslash returns null:
+	 * browsers never send either in Origin or Referer, and parsers disagree
+	 * on which host such a URL names.
 	 *
 	 * @since 1.1.19
 	 *
@@ -617,7 +644,11 @@ class _Init {
 	 * @return array|null
 	 */
 	protected static function url_origin( $url ) {
-		if ( ! is_string( $url ) || '' === $url ) {
+		if ( ! is_string( $url ) || '' === $url || false !== strpos( $url, '\\' ) ) {
+			return null;
+		}
+
+		if ( null !== wp_parse_url( $url, PHP_URL_USER ) || null !== wp_parse_url( $url, PHP_URL_PASS ) ) {
 			return null;
 		}
 
@@ -654,19 +685,22 @@ class _Init {
 	 *
 	 * @since 1.1.19
 	 *
-	 * @param string $name `HTTP_ORIGIN` or `HTTP_REFERER`.
+	 * WordPress slashes `$_SERVER` in `wp_magic_quotes()`, so the value is
+	 * unslashed back to what the browser sent.
+	 *
+	 * @param string $name `HTTP_SEC_FETCH_SITE`, `HTTP_ORIGIN`, or `HTTP_REFERER`.
 	 * @return string
 	 */
 	protected static function request_header( $name ) {
-		if ( 'HTTP_ORIGIN' === $name && isset( $_SERVER['HTTP_ORIGIN'] ) && is_string( $_SERVER['HTTP_ORIGIN'] ) ) {
-			return sanitize_text_field( wp_unslash( $_SERVER['HTTP_ORIGIN'] ) );
+		if ( ! in_array( $name, array( 'HTTP_SEC_FETCH_SITE', 'HTTP_ORIGIN', 'HTTP_REFERER' ), true ) ) {
+			return '';
 		}
 
-		if ( 'HTTP_REFERER' === $name && isset( $_SERVER['HTTP_REFERER'] ) && is_string( $_SERVER['HTTP_REFERER'] ) ) {
-			return sanitize_text_field( wp_unslash( $_SERVER['HTTP_REFERER'] ) );
+		if ( ! isset( $_SERVER[ $name ] ) || ! is_string( $_SERVER[ $name ] ) ) {
+			return '';
 		}
 
-		return '';
+		return sanitize_text_field( wp_unslash( $_SERVER[ $name ] ) );
 	}
 
 	/**

@@ -52,12 +52,15 @@ Practical consequences:
   (`cp_export_items`, `cpl_adapter_import_sermon_audio`,
   `cpl_adapter_pull_sermon_audio`, `cpl_import_transcript`, `cp_upload_import_file`)
   available to a logged-in user with the required capability. A valid core nonce,
-  or a `_wpnonce` created for the action name (what CP Library 1.8.0 and CP Sync
-  already send), authorizes the action on any request method. Without either
-  nonce the request must be POST and same-site. Same-site means the Origin header, or the Referer
-  when Origin is absent, has the same scheme, host, and port as `home_url()` or
-  `admin_url()`. A GET or HEAD, missing headers, or a different scheme, host, or
-  port does not run. Registering one of those names on `cp_request_actions` opts
+  or the `_wpnonce` CP Library 1.8.0 already sends (for the action name on export and
+  the SermonAudio buttons, for `cpl_import_transcript_<post_id>` on transcript
+  import), authorizes the action on any request method. Without either nonce the
+  request must be POST and same-site. `Sec-Fetch-Site` decides when the browser sends
+  it: only `same-origin` passes. It is still sent under `Referrer-Policy: no-referrer`,
+  when Origin is `null` and there is no Referer. Without it, the Origin header, or the
+  Referer when Origin is absent, must have the same scheme, host, and port as
+  `home_url()` or `admin_url()`. `Origin: null`, a URL with user info or a backslash,
+  a GET or HEAD, missing headers, or a different scheme, host, or port does not run. Registering one of those names on `cp_request_actions` opts
   it into the nonce check. `cp_upload_import_file` is the CSV upload used by older
   CP Library releases.
 * `cpl_import_transcript` is checked as `edit_post` against the requested `post_id`, so
