@@ -35,6 +35,51 @@ Practical consequences:
 
 ## Changelog
 
+### 1.1.19
+* Request action hardening: `Admin\_Init::request_actions()` applies stricter checks
+  before it dispatches a `cp_action` request. Names on the `cp_request_actions`
+  allowlist run for a logged-in user who has the required capability (default
+  `manage_options`, filter `cp_request_action_capability`) and a valid core nonce.
+  `request_action_nonce_field()` and `request_action_nonce_url()` build that nonce
+  for a form or a link. `request_action_nonce_url()` returns an HTML-escaped URL,
+  the same way `wp_nonce_url()` does. Names on neither the allowlist, the legacy
+  list, nor the public list are ignored.
+* Front-end forms that verify their own nonce can opt in through
+  `cp_public_request_actions`. `cp_send_email` (CP Groups) and `cp_staff_send_email`
+  (CP Staff) are registered by default so those email forms keep working. Callbacks on
+  that list must verify their own nonce.
+* `cp_legacy_request_actions` keeps the CP Library admin actions
+  (`cp_export_items`, `cpl_adapter_import_sermon_audio`,
+  `cpl_adapter_pull_sermon_audio`, `cpl_import_transcript`, `cp_upload_import_file`)
+  available to a logged-in user with the required capability. A valid core nonce,
+  or the `_wpnonce` CP Library 1.8.0 already sends (for the action name on export and
+  the SermonAudio buttons, for `cpl_import_transcript_<post_id>` on transcript
+  import), authorizes the action on any request method. Without either nonce the
+  request must be POST and same-site. `Sec-Fetch-Site` decides when the browser sends
+  it: only `same-origin` passes. It is still sent under `Referrer-Policy: no-referrer`,
+  when Origin is `null` and there is no Referer. Without it, the Origin header, or the
+  Referer when Origin is absent, must have the same scheme, host, and port as
+  `home_url()` or `admin_url()`. `Origin: null`, a URL with user info or a backslash,
+  a GET or HEAD, missing headers, or a different scheme, host, or port does not run. Registering one of those names on `cp_request_actions` opts
+  it into the nonce check. `cp_upload_import_file` is the CSV upload used by older
+  CP Library releases.
+* `cpl_import_transcript` is checked as `edit_post` against the requested `post_id`, so
+  an author can import a transcript for their own sermon and not for anyone else's. A
+  request without a `post_id` does not run. CP Library releases before 1.8.0 do no
+  check of their own, so this has to happen in the dispatcher. Other request actions
+  still default to `manage_options`. `cp_request_action_capability` can override either
+  default; for the transcript import the filtered capability is still checked against
+  the sermon.
+* A refused request for a registered name fires `cp_request_action_refused` with the
+  action and a reason (`capability`, `nonce`, or `same_site`). A JSON request also gets
+  a 403 `wp_send_json_error( array( 'error' => ... ) )` instead of an empty response.
+  Unregistered names are still ignored silently.
+* Tests: PHPUnit lives in `tests/composer.json`, apart from the root `composer.json`, so
+  installing it never rewrites the production autoloader under `vendor/`. Run
+  `composer install && composer test` from `tests/`. Do this in a standalone clone, not
+  inside a plugin's `includes/ChurchPlugins` submodule: plugin zips copy `includes/**`,
+  and `tests/vendor/` would ship with them.
+
 ### 1.1.18
 * Fix: `Models\Table::insert()`/`update()` retry a failed write without characters the
   column cannot physically store. Our tables are created without an explicit charset, so

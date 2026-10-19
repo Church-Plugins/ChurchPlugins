@@ -1,0 +1,14 @@
+{
+    "name": "church-plugins/framework-tests",
+    "description": "Test tooling for the ChurchPlugins framework. Kept apart from the root composer.json so installing it never rewrites the autoloader that plugin zips ship.",
+    "type": "project",
+    "license": "GPL-2.0-or-later",
+    "require": {
+        "phpunit/phpunit": "^9.6"
+    },
+    "scripts": {
+        "test": "phpunit -c ../phpunit.xml.dist"
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

@@ -1,0 +1,6 @@
+# Test tooling installs into tests/vendor/ (see tests/composer.json). The root
+# vendor/ holds the committed production autoloader and has no dev packages.
+/tests/vendor/
+
+.phpunit.cache/
+.phpunit.result.cache
