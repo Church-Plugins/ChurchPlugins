@@ -363,18 +363,35 @@ class _Init {
 	/**
 	 * Post ID from the current request, or 0.
 	 *
+	 * The callback may read `post_id` from `$_REQUEST` or from the array it is
+	 * passed, which is `$_POST` or `$_GET` (see {@see self::request_action_vars()}).
+	 * When those sources disagree, the ID checked here could differ from the
+	 * one the callback acts on, so the request gets 0 and is refused.
+	 *
 	 * @since 1.1.19
 	 *
 	 * @return int
 	 */
 	protected static function requested_post_id() {
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read for the capability check. The nonce is checked separately.
-		if ( ! isset( $_REQUEST['post_id'] ) || ! is_scalar( $_REQUEST['post_id'] ) ) {
-			return 0;
-		}
+		$ids = array();
 
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		return absint( wp_unslash( $_REQUEST['post_id'] ) );
+		// phpcs:disable WordPress.Security.NonceVerification.Missing, WordPress.Security.NonceVerification.Recommended -- Read for the capability check. The nonce is checked separately.
+		foreach ( array( $_GET, $_POST, $_REQUEST ) as $source ) {
+			if ( ! isset( $source['post_id'] ) ) {
+				continue;
+			}
+
+			if ( ! is_scalar( $source['post_id'] ) ) {
+				return 0;
+			}
+
+			$ids[] = absint( wp_unslash( $source['post_id'] ) );
+		}
+		// phpcs:enable WordPress.Security.NonceVerification.Missing, WordPress.Security.NonceVerification.Recommended
+
+		$ids = array_unique( $ids );
+
+		return 1 === count( $ids ) ? reset( $ids ) : 0;
 	}
 
 	/**

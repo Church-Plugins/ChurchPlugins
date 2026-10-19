@@ -376,6 +376,50 @@ class RequestActionsTest extends TestCase {
 	}
 
 	/**
+	 * A post_id that differs between the query string and the POST body is refused.
+	 *
+	 * The capability check read $_REQUEST, where the POST value wins, while
+	 * the callback is passed $_GET when cp_action is only in the query
+	 * string. An author could pass the check with their own sermon in the
+	 * body and have a callback that reads its argument act on another one.
+	 */
+	public function test_transcript_import_with_conflicting_post_ids_is_refused() {
+		$this->set_user( true, array( 'edit_posts', 'edit_post:10' ) );
+		$this->set_referer( 'https://example.test/wp-admin/edit.php?post_type=cpl_item' );
+		$_SERVER['REQUEST_METHOD'] = 'POST';
+		$_GET     = array(
+			'cp_action' => 'cpl_import_transcript',
+			'post_id'   => '11',
+		);
+		$_POST    = array( 'post_id' => '10' );
+		$_REQUEST = array_merge( $_GET, $_POST );
+
+		$this->dispatch();
+
+		$this->assertSame( array(), $this->dispatched_hooks() );
+	}
+
+	/**
+	 * The same post_id in the query string and the POST body still runs.
+	 */
+	public function test_transcript_import_with_matching_post_ids_runs() {
+		$this->set_user( true, array( 'edit_posts', 'edit_post:10' ) );
+		$this->set_referer( 'https://example.test/wp-admin/edit.php?post_type=cpl_item' );
+		$_SERVER['REQUEST_METHOD'] = 'POST';
+		$_GET     = array(
+			'cp_action' => 'cpl_import_transcript',
+			'post_id'   => '10',
+		);
+		$_POST    = array( 'post_id' => '10' );
+		$_REQUEST = array_merge( $_GET, $_POST );
+
+		$this->dispatch();
+
+		$this->assertSame( array( 'cpl_import_transcript' ), $this->dispatched_hooks() );
+		$this->assertSame( '10', $GLOBALS['cp_test_actions'][0]['arg']['post_id'] );
+	}
+
+	/**
 	 * Other legacy actions still require manage_options.
 	 */
 	public function test_editor_cannot_run_other_legacy_actions() {
