@@ -57,7 +57,7 @@ class Options {
 				'methods'             => 'GET',
 				'callback'            => [ $this, 'get_option_group' ],
 				'permission_callback' => function() {
-					return true; // current_user_can( 'manage_options' );
+					return current_user_can( 'manage_options' );
 				},
 			]
 		);
