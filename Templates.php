@@ -17,6 +17,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 abstract class Templates {
 
 	/**
+	 * Framework version every active plugin must bundle for the block template
+	 * handoff to be on by default.
+	 *
+	 * @since 1.1.21
+	 */
+	const BLOCK_TEMPLATES_VERSION = '1.1.21';
+
+	/**
 	 * @var self
 	 */
 	protected static $_instance;
@@ -47,6 +55,31 @@ abstract class Templates {
 	public static $themes_with_compatibility_fixes = [];
 
 	/**
+	 * Every constructed Templates instance, keyed by class name.
+	 *
+	 * @since 1.1.21
+	 * @var self[]
+	 */
+	protected static $instances = [];
+
+	/**
+	 * Whether the current request is handed off to the block template hierarchy.
+	 * Null until decided.
+	 *
+	 * @since 1.1.21
+	 * @var bool|null
+	 */
+	protected $block_template_handoff = null;
+
+	/**
+	 * The plugin's human-readable name. Null until read.
+	 *
+	 * @since 1.1.21
+	 * @var string|null
+	 */
+	protected $plugin_name = null;
+
+	/**
 	 * Only make one instance of PostType
 	 *
 	 * @return self
@@ -65,8 +98,14 @@ abstract class Templates {
 	 * Initialize the Template Yumminess!
 	 */
 	protected function __construct() {
+		self::$instances[ get_called_class() ] = $this;
+
 		// Choose the wordpress theme template to use
 		add_filter( 'template_include', [ $this, 'template_include' ] );
+
+		// Block themes: let the template hierarchy pick our templates.
+		add_action( 'init', [ $this, 'register_block_templates' ], 99 );
+		add_filter( 'get_block_templates', [ $this, 'filter_block_templates' ], 10, 3 );
 
 		// don't query the database for the spoofed post
 		wp_cache_set( $this->spoofed_post()->ID, $this->spoofed_post(), 'posts' );
@@ -173,23 +212,37 @@ abstract class Templates {
 	 * @author Tanner Moushey
 	 */
 	public function is_cp_query() {
-		if ( ! $wp_query = $this->get_global_query_object() ) {
+		if ( ! $this->get_global_query_object() ) {
 			return false;
 		}
 
-		$cpl_query = false;
-		$types = $this->get_post_types();
+		return apply_filters( 'cp_template_is_query', $this->matches_query(), $this );
+	}
 
-		if ( $wp_query->is_singular( $types ) || $wp_query->is_post_type_archive( $types ) ) {
-			$cpl_query = true;
+	/**
+	 * Whether the main query is for one of this plugin's post types or
+	 * taxonomies, before the `cp_template_is_query` filter.
+	 *
+	 * A plugin that registers its types only in some cases returns empty
+	 * lists otherwise. WP_Query reads an empty list as "any", so empty lists
+	 * are skipped here instead of passed on.
+	 *
+	 * @since 1.1.21
+	 *
+	 * @return bool
+	 */
+	public function matches_query() {
+		$wp_query = $this->get_global_query_object();
+
+		if ( ! $wp_query ) {
+			return false;
 		}
 
-		$taxonomies = $this->get_taxonomies();
-		if ( $wp_query->is_tax( $taxonomies ) ) {
-			$cpl_query = true;
-		}
+		$types      = (array) $this->get_post_types();
+		$taxonomies = (array) $this->get_taxonomies();
 
-		return apply_filters( 'cp_template_is_query', $cpl_query, $this );
+		return ( $types && ( $wp_query->is_singular( $types ) || $wp_query->is_post_type_archive( $types ) ) )
+			|| ( $taxonomies && $wp_query->is_tax( $taxonomies ) );
 	}
 
 	/**
@@ -224,6 +277,16 @@ abstract class Templates {
 		do_action( 'cp_template_chooser', $template, $this );
 
 		if ( ! $this->is_cp_query() ) {
+			return $template;
+		}
+
+		// Core has already resolved one of our block templates (or a theme / user override of it).
+		if ( $this->uses_block_template_handoff() ) {
+			// The view block renders the default template's shell; keep its body classes.
+			self::$template = $this->get_template_hierarchy( 'default-template' );
+			add_filter( 'body_class', [ $this, 'theme_body_class' ] );
+			add_filter( 'body_class', [ $this, 'template_body_class' ] );
+
 			return $template;
 		}
 
@@ -293,6 +356,398 @@ abstract class Templates {
 		} else {
 			return $template;
 		}
+	}
+
+	/**
+	 * Get the plugin's human-readable name.
+	 *
+	 * Read from the Plugin Name header of {plugin-path}/{plugin-id}.php, which
+	 * is how ChurchPlugins plugins name their main file; falls back to the id.
+	 *
+	 * @since 1.1.21
+	 *
+	 * @return string
+	 */
+	public function get_plugin_name() {
+		if ( null === $this->plugin_name ) {
+			$file = trailingslashit( $this->get_plugin_path() ) . $this->get_plugin_id() . '.php';
+			$data = is_readable( $file ) ? get_file_data( $file, [ 'name' => 'Plugin Name' ] ) : [];
+
+			$this->plugin_name = ! empty( $data['name'] ) ? $data['name'] : $this->get_plugin_id();
+		}
+
+		return $this->plugin_name;
+	}
+
+	/**
+	 * Get every constructed Templates instance.
+	 *
+	 * @since 1.1.21
+	 *
+	 * @return self[]
+	 */
+	public static function get_registered_instances() {
+		return array_values( self::$instances );
+	}
+
+	/**
+	 * Get the Templates instance for a plugin.
+	 *
+	 * @since 1.1.21
+	 *
+	 * @param string $plugin_id Plugin id, as returned by get_plugin_id().
+	 * @return self|null
+	 */
+	public static function get_plugin_instance( $plugin_id ) {
+		foreach ( self::$instances as $instance ) {
+			if ( $plugin_id && $instance->get_plugin_id() === $plugin_id ) {
+				return $instance;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Lowest ChurchPlugins framework version bundled by the active plugins.
+	 *
+	 * Each active plugin loads its bundled copy's versioned loader class, so
+	 * the declared ChurchPlugins_* classes cover every copy that could serve
+	 * the site if the plugins carrying newer copies were deactivated.
+	 *
+	 * @since 1.1.21
+	 *
+	 * @return string
+	 */
+	public static function get_lowest_framework_version() {
+		static $lowest = null;
+
+		if ( null !== $lowest ) {
+			return $lowest;
+		}
+
+		$lowest = CHURCHPLUGINS_VERSION;
+
+		foreach ( get_declared_classes() as $class ) {
+			if ( 0 !== strpos( $class, 'ChurchPlugins_' ) || ! defined( $class . '::VERSION' ) ) {
+				continue;
+			}
+
+			$version = (string) constant( $class . '::VERSION' );
+
+			if ( version_compare( $version, $lowest, '<' ) ) {
+				$lowest = $version;
+			}
+		}
+
+		return $lowest;
+	}
+
+	/**
+	 * Whether this plugin's pages are rendered through block templates.
+	 *
+	 * On by default on block themes (WordPress 6.7+) only when every active
+	 * ChurchPlugins plugin bundles a framework that supports the handoff. A
+	 * template customized in the Site Editor stores the churchplugins/view
+	 * block, which older framework copies do not register; if such a copy
+	 * took over the site, the customized template would render empty.
+	 *
+	 * Also off when the theme overrides the plugin's default-template.php: an
+	 * override was written to replace the whole block template, and may print
+	 * block markup that only the legacy path parses.
+	 *
+	 * @since 1.1.21
+	 *
+	 * @return bool
+	 */
+	public function supports_block_templates() {
+		if ( ! function_exists( 'register_block_template' ) || ! wp_is_block_theme() ) {
+			return false;
+		}
+
+		$enabled = version_compare( self::get_lowest_framework_version(), self::BLOCK_TEMPLATES_VERSION, '>=' )
+			&& ! locate_template( $this->get_plugin_id() . '/default-template.php' );
+
+		/**
+		 * Whether to render this plugin's pages through the block template hierarchy.
+		 *
+		 * Return false to keep the legacy behavior on block themes: no registered
+		 * block templates, and the plugin's default-template.php replaces the
+		 * resolved block template. Return true to opt in while an active plugin
+		 * still bundles an older framework, accepting that templates customized
+		 * in the Site Editor render empty if that older copy ever serves the site.
+		 *
+		 * @since 1.1.21
+		 *
+		 * @param bool      $enabled   Whether the handoff is enabled.
+		 * @param Templates $templates The plugin's Templates instance.
+		 */
+		return (bool) apply_filters( 'cp_block_template_handoff', $enabled, $this );
+	}
+
+	/**
+	 * Register block templates for this plugin's post types and taxonomies.
+	 *
+	 * Registers {plugin-id}//single-{post_type}, {plugin-id}//archive-{post_type}
+	 * and {plugin-id}//taxonomy-{taxonomy}. A theme file or a Site Editor
+	 * customization with the same slug takes precedence in core.
+	 *
+	 * @since 1.1.21
+	 *
+	 * @return void
+	 */
+	public function register_block_templates() {
+		if ( ! $this->supports_block_templates() ) {
+			return;
+		}
+
+		$templates = [];
+
+		foreach ( (array) $this->get_post_types() as $post_type ) {
+			$object = get_post_type_object( $post_type );
+
+			if ( ! $object || ! is_post_type_viewable( $object ) ) {
+				continue;
+			}
+
+			/* translators: %s: Post type singular name. */
+			$templates[ 'single-' . $post_type ] = sprintf( __( 'Single %s', 'churchplugins' ), $object->labels->singular_name );
+
+			if ( $object->has_archive ) {
+				/* translators: %s: Post type plural name. */
+				$templates[ 'archive-' . $post_type ] = sprintf( __( '%s Archive', 'churchplugins' ), $object->labels->name );
+			}
+		}
+
+		foreach ( (array) $this->get_taxonomies() as $taxonomy ) {
+			$object = get_taxonomy( $taxonomy );
+
+			if ( ! $object || ! is_taxonomy_viewable( $object ) ) {
+				continue;
+			}
+
+			/* translators: %s: Taxonomy singular name. */
+			$templates[ 'taxonomy-' . $taxonomy ] = sprintf( __( '%s Archive', 'churchplugins' ), $object->labels->singular_name );
+		}
+
+		$content     = $this->get_block_template_content();
+		$plugin_name = $this->get_plugin_name();
+
+		foreach ( $templates as $slug => $title ) {
+			$name = $this->get_plugin_id() . '//' . $slug;
+
+			if ( \WP_Block_Templates_Registry::get_instance()->is_registered( $name ) ) {
+				continue;
+			}
+
+			register_block_template(
+				$name,
+				[
+					/* translators: 1: Plugin name, 2: Template title. */
+					'title'       => sprintf( __( '%1$s: %2$s', 'churchplugins' ), $plugin_name, $title ),
+					/* translators: %s: Plugin name. */
+					'description' => sprintf( __( 'Displays the %s view between the site header and footer.', 'churchplugins' ), $plugin_name ),
+					'content'     => $content,
+				]
+			);
+		}
+	}
+
+	/**
+	 * Block markup shared by this plugin's registered templates.
+	 *
+	 * @since 1.1.21
+	 *
+	 * @return string
+	 */
+	protected function get_block_template_content() {
+		$view = sprintf(
+			'<!-- wp:churchplugins/view %s /-->',
+			wp_json_encode(
+				[
+					'plugin' => $this->get_plugin_id(),
+					'align'  => 'wide',
+				]
+			)
+		);
+
+		return implode(
+			"\n\n",
+			[
+				apply_filters( 'cp_template_block_header', '<!-- wp:template-part {"slug":"header","area":"header","tagName":"header"} /-->' ),
+				'<!-- wp:group {"tagName":"main","layout":{"type":"constrained"}} -->',
+				'<main class="wp-block-group">' . $view . '</main>',
+				'<!-- /wp:group -->',
+				apply_filters( 'cp_template_block_footer', '<!-- wp:template-part {"slug":"footer","area":"footer","tagName":"footer"} /-->' ),
+			]
+		);
+	}
+
+	/**
+	 * Whether the current request is left to the block template hierarchy.
+	 *
+	 * True only for a request that is natively for this plugin's post types or
+	 * taxonomies, because only then does core resolve this plugin's templates.
+	 * False on classic themes, when the handoff is disabled, when
+	 * `cp_template_is_query` adds or removes the request, and when the request
+	 * uses one of the legacy modes that need the PHP templates: a page template
+	 * chosen with `cp_default_template`, or a [cp-template] shortcode /
+	 * `cp_disable_template`. Decided once per request.
+	 *
+	 * @since 1.1.21
+	 *
+	 * @return bool
+	 */
+	public function uses_block_template_handoff() {
+		if ( null !== $this->block_template_handoff ) {
+			return $this->block_template_handoff;
+		}
+
+		$handoff = $this->matches_query()
+			&& $this->is_cp_query()
+			&& $this->supports_block_templates()
+			&& ! apply_filters( 'cp_default_template', false, $this )
+			&& ! apply_filters( 'cp_disable_template', has_shortcode( get_the_content(), 'cp-template' ), $this->get_template_hierarchy( 'default-template' ), $this );
+
+		$this->block_template_handoff = $handoff;
+
+		return $handoff;
+	}
+
+	/**
+	 * Hide this plugin's registered templates from a front-end request that
+	 * stays on the legacy path, so core resolves the same template it did
+	 * before the templates were registered.
+	 *
+	 * Site Editor customizations (source "custom") and theme files are kept.
+	 *
+	 * @since 1.1.21
+	 *
+	 * @param \WP_Block_Template[] $templates     Found block templates.
+	 * @param array                $query         Template query.
+	 * @param string               $template_type wp_template or wp_template_part.
+	 * @return \WP_Block_Template[]
+	 */
+	public function filter_block_templates( $templates, $query, $template_type ) {
+		if ( 'wp_template' !== $template_type || ! did_action( 'template_redirect' ) || ! $this->matches_query() ) {
+			return $templates;
+		}
+
+		if ( $this->uses_block_template_handoff() ) {
+			return $templates;
+		}
+
+		$plugin_id = $this->get_plugin_id();
+
+		return array_values(
+			array_filter(
+				$templates,
+				static function ( $template ) use ( $plugin_id ) {
+					return ! ( 'plugin' === $template->source && $plugin_id === $template->plugin );
+				}
+			)
+		);
+	}
+
+	/**
+	 * Render the plugin's default template for the view block.
+	 *
+	 * Runs default-template.php without the framework's site header and footer,
+	 * as the [cp-template] shortcode does, so the template's class filters and
+	 * before/after hooks still run. The template's <main> element is split off
+	 * so the block can carry its id and classes without printing a second
+	 * <main> inside the block template's own.
+	 *
+	 * A plugin whose templates print their own header and footer overrides
+	 * this method, leaves those out while it renders, and passes the output
+	 * to split_view_html().
+	 *
+	 * @since 1.1.21
+	 *
+	 * @return array See split_view_html().
+	 */
+	public function get_block_view_parts() {
+		$file = $this->get_template_hierarchy( 'default-template' );
+
+		if ( ! $file ) {
+			ob_start();
+			$this->get_view();
+
+			return [
+				'before'     => '',
+				'attributes' => [],
+				'content'    => ob_get_clean(),
+				'after'      => '',
+			];
+		}
+
+		$restore_header = remove_action( 'cp_do_header', __CLASS__ . '::do_header' );
+		$restore_footer = remove_action( 'cp_do_footer', __CLASS__ . '::do_footer' );
+
+		try {
+			ob_start();
+			include $file;
+			$html = ob_get_clean();
+		} finally {
+			if ( $restore_header ) {
+				add_action( 'cp_do_header', __CLASS__ . '::do_header' );
+			}
+
+			if ( $restore_footer ) {
+				add_action( 'cp_do_footer', __CLASS__ . '::do_footer' );
+			}
+		}
+
+		return self::split_view_html( $html );
+	}
+
+	/**
+	 * Split a rendered view around its <main> element.
+	 *
+	 * Markup without a <main> element is returned whole as the content.
+	 *
+	 * @since 1.1.21
+	 *
+	 * @param string $html Rendered view markup.
+	 * @return array {
+	 *     @type string $before     Output printed before <main>.
+	 *     @type array  $attributes The <main> element's id and class.
+	 *     @type string $content    Output inside <main>.
+	 *     @type string $after      Output printed after </main>.
+	 * }
+	 */
+	protected static function split_view_html( $html ) {
+		$html  = (string) $html;
+		$parts = [
+			'before'     => '',
+			'attributes' => [],
+			'content'    => $html,
+			'after'      => '',
+		];
+
+		$close = strripos( $html, '</main>' );
+
+		if ( false === $close || ! preg_match( '/<main\b[^>]*>/i', $html, $open, PREG_OFFSET_CAPTURE ) || $open[0][1] > $close ) {
+			return $parts;
+		}
+
+		$open_end = $open[0][1] + strlen( $open[0][0] );
+		$tag      = new \WP_HTML_Tag_Processor( $open[0][0] );
+		$tag->next_tag();
+
+		foreach ( [ 'id', 'class' ] as $name ) {
+			$value = $tag->get_attribute( $name );
+
+			if ( is_string( $value ) && '' !== $value ) {
+				$parts['attributes'][ $name ] = $value;
+			}
+		}
+
+		$parts['before']  = substr( $html, 0, $open[0][1] );
+		$parts['content'] = substr( $html, $open_end, $close - $open_end );
+		$parts['after']   = substr( $html, $close + strlen( '</main>' ) );
+
+		return $parts;
 	}
 
 	/**
