@@ -290,22 +290,12 @@ abstract class Templates {
 			return $template;
 		}
 
-		if ( str_ends_with( $template, '/wp-includes/template-canvas.php' ) ) {
-			$name = is_archive() ? 'archive-' : 'single-';
-			$name .= get_post_type() ? get_post_type() : 'post';
+		// The theme or a Site Editor customization supplies a block template for this request; use it.
+		if ( $this->resolved_block_template_overrides( $template ) ) {
+			add_filter( 'body_class', [ $this, 'theme_body_class' ] );
+			add_filter( 'body_class', [ $this, 'template_body_class' ] );
 
-			// find an existing FSE template
-			$template_posts = get_posts(
-				[
-					'post_type' => 'wp_template',
-					'name'      => $name,
-				]
-			);
-
-			// don't use our custom template of one exists
-			if ( ! empty( $template_posts ) ) {
-				return $template;
-			}
+			return $template;
 		}
 
 		// if it's a single 404
@@ -356,6 +346,74 @@ abstract class Templates {
 		} else {
 			return $template;
 		}
+	}
+
+	/**
+	 * Whether the block template core resolved for this request is one the
+	 * theme or a Site Editor customization provides specifically for this
+	 * plugin's content, so the legacy path should leave it in place.
+	 *
+	 * Used only on the legacy path (the block template handoff is off). The
+	 * decision is made from the template core actually resolved, not from a
+	 * guessed slug: a block theme's generic archive, single or index template
+	 * never qualifies, and neither does a customization saved for another
+	 * theme. A qualifying template is kept whether or not it contains the view
+	 * block, since a customer may have replaced the view with core blocks.
+	 *
+	 * Qualifying slugs, for a request this plugin matches natively:
+	 * single-{post_type}, single-{post_type}-{post_name}, the custom template
+	 * assigned to the post, archive-{post_type}, taxonomy-{taxonomy} and
+	 * taxonomy-{taxonomy}-{term}.
+	 *
+	 * @since 1.1.22
+	 *
+	 * @param string $template Path of the template core chose.
+	 * @return bool
+	 */
+	protected function resolved_block_template_overrides( $template ) {
+		global $_wp_current_template_id;
+
+		if ( ! str_ends_with( $template, '/wp-includes/template-canvas.php' ) || empty( $_wp_current_template_id ) ) {
+			return false;
+		}
+
+		$block_template = get_block_template( $_wp_current_template_id );
+
+		if ( ! $block_template || ! in_array( $block_template->source, [ 'custom', 'theme' ], true ) ) {
+			return false;
+		}
+
+		$slug     = $block_template->slug;
+		$wp_query = $this->get_global_query_object();
+		$object   = $wp_query->get_queried_object();
+
+		$types      = (array) $this->get_post_types();
+		$taxonomies = (array) $this->get_taxonomies();
+
+		if ( $types && $wp_query->is_singular( $types ) && $object instanceof \WP_Post ) {
+			$assigned = get_page_template_slug( $object );
+
+			return 'single-' . $object->post_type === $slug
+				|| 0 === strpos( $slug, 'single-' . $object->post_type . '-' )
+				|| ( $assigned && preg_replace( '/\.php$/', '', $assigned ) === $slug );
+		}
+
+		if ( $types && $wp_query->is_post_type_archive( $types ) ) {
+			foreach ( array_filter( (array) $wp_query->get( 'post_type' ) ) as $post_type ) {
+				if ( 'archive-' . $post_type === $slug ) {
+					return true;
+				}
+			}
+
+			return false;
+		}
+
+		if ( $taxonomies && $wp_query->is_tax( $taxonomies ) && $object instanceof \WP_Term ) {
+			return 'taxonomy-' . $object->taxonomy === $slug
+				|| 0 === strpos( $slug, 'taxonomy-' . $object->taxonomy . '-' );
+		}
+
+		return false;
 	}
 
 	/**
@@ -796,7 +854,9 @@ abstract class Templates {
 	 */
 	public function template_body_class( $classes ) {
 
-		$template_filename = basename( self::$template );
+		// A theme or customized block template leaves self::$template unset, so the
+		// [cp-template] shortcode stays inert there; the view is the default template's.
+		$template_filename = basename( self::$template ? self::$template : (string) $this->get_template_hierarchy( 'default-template' ) );
 
 		$classes[] = 'cp-template';
 
