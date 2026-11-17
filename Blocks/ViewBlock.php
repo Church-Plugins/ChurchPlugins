@@ -106,6 +106,10 @@ class ViewBlock {
 	/**
 	 * Render the plugin view for the current request.
 	 *
+	 * The output is the plugin's default template without the site header and
+	 * footer; the block wrapper takes the id and classes of that template's
+	 * <main>, so the legacy wrapper CSS and class filters keep applying.
+	 *
 	 * The block renders only as part of a template: inside post content (the
 	 * `the_content` filter, which the views themselves call) it prints nothing,
 	 * so a block placed in a post or a pattern cannot render the view, which
@@ -141,16 +145,14 @@ class ViewBlock {
 		$query_post    = $wp_query->post;
 		$in_the_loop   = $wp_query->in_the_loop;
 		$buffer_level  = ob_get_level();
-		$html          = '';
+		$parts         = null;
 
 		self::$rendering = true;
 
 		try {
 			$wp_query->rewind_posts();
 
-			ob_start();
-			$templates->get_view();
-			$html = ob_get_clean();
+			$parts = $templates->get_block_view_parts();
 		} finally {
 			// Close the view's buffer, and any it left open, even when it throws.
 			while ( ob_get_level() > $buffer_level ) {
@@ -171,14 +173,12 @@ class ViewBlock {
 			self::$rendering = false;
 		}
 
-		if ( '' === trim( $html ) ) {
+		if ( '' === trim( implode( '', [ $parts['before'], $parts['content'], $parts['after'] ] ) ) ) {
 			return '';
 		}
 
-		return sprintf(
-			'<div %1$s>%2$s</div>',
-			get_block_wrapper_attributes( [ 'class' => 'cp-view cp-view--' . sanitize_html_class( $plugin_id ) ] ),
-			$html
-		);
+		return $parts['before']
+			. sprintf( '<div %1$s>%2$s</div>', get_block_wrapper_attributes( $parts['attributes'] ), $parts['content'] )
+			. $parts['after'];
 	}
 }

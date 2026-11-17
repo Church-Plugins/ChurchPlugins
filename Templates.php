@@ -262,6 +262,11 @@ abstract class Templates {
 
 		// Core has already resolved one of our block templates (or a theme / user override of it).
 		if ( $this->uses_block_template_handoff() ) {
+			// The view block renders the default template's shell; keep its body classes.
+			self::$template = $this->get_template_hierarchy( 'default-template' );
+			add_filter( 'body_class', [ $this, 'theme_body_class' ] );
+			add_filter( 'body_class', [ $this, 'template_body_class' ] );
+
 			return $template;
 		}
 
@@ -366,8 +371,9 @@ abstract class Templates {
 	 * Whether this plugin's pages are rendered through block templates.
 	 *
 	 * True on block themes (WordPress 6.7+) unless the theme overrides the
-	 * plugin's default-template.php, which the block templates do not use, or
-	 * the `cp_block_template_handoff` filter returns false.
+	 * plugin's default-template.php or the `cp_block_template_handoff` filter
+	 * returns false. An override was written to replace the whole block
+	 * template, and may print block markup that only the legacy path parses.
 	 *
 	 * @since 1.1.21
 	 *
@@ -555,6 +561,86 @@ abstract class Templates {
 				}
 			)
 		);
+	}
+
+	/**
+	 * Render the plugin's default template for the view block.
+	 *
+	 * Runs default-template.php without the framework's site header and footer,
+	 * as the [cp-template] shortcode does, so the template's class filters and
+	 * before/after hooks still run. The template's <main> element is split off
+	 * so the block can carry its id and classes without printing a second
+	 * <main> inside the block template's own.
+	 *
+	 * @since 1.1.21
+	 *
+	 * @return array {
+	 *     @type string $before     Output printed before <main> (the after-header hook).
+	 *     @type array  $attributes The <main> element's id and class.
+	 *     @type string $content    Output inside <main>.
+	 *     @type string $after      Output printed after </main> (the before-footer hook).
+	 * }
+	 */
+	public function get_block_view_parts() {
+		$parts = [
+			'before'     => '',
+			'attributes' => [],
+			'content'    => '',
+			'after'      => '',
+		];
+
+		$file = $this->get_template_hierarchy( 'default-template' );
+
+		if ( ! $file ) {
+			ob_start();
+			$this->get_view();
+			$parts['content'] = ob_get_clean();
+
+			return $parts;
+		}
+
+		$restore_header = remove_action( 'cp_do_header', __CLASS__ . '::do_header' );
+		$restore_footer = remove_action( 'cp_do_footer', __CLASS__ . '::do_footer' );
+
+		try {
+			ob_start();
+			include $file;
+			$html = ob_get_clean();
+		} finally {
+			if ( $restore_header ) {
+				add_action( 'cp_do_header', __CLASS__ . '::do_header' );
+			}
+
+			if ( $restore_footer ) {
+				add_action( 'cp_do_footer', __CLASS__ . '::do_footer' );
+			}
+		}
+
+		$close = strripos( $html, '</main>' );
+
+		if ( false === $close || ! preg_match( '/<main\b[^>]*>/i', $html, $open, PREG_OFFSET_CAPTURE ) || $open[0][1] > $close ) {
+			$parts['content'] = $html;
+
+			return $parts;
+		}
+
+		$open_end = $open[0][1] + strlen( $open[0][0] );
+		$tag      = new \WP_HTML_Tag_Processor( $open[0][0] );
+		$tag->next_tag();
+
+		foreach ( [ 'id', 'class' ] as $name ) {
+			$value = $tag->get_attribute( $name );
+
+			if ( is_string( $value ) && '' !== $value ) {
+				$parts['attributes'][ $name ] = $value;
+			}
+		}
+
+		$parts['before']  = substr( $html, 0, $open[0][1] );
+		$parts['content'] = substr( $html, $open_end, $close - $open_end );
+		$parts['after']   = substr( $html, $close + strlen( '</main>' ) );
+
+		return $parts;
 	}
 
 	/**
