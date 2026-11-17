@@ -82,7 +82,11 @@ class ViewBlock {
 	}
 
 	/**
-	 * Pass the plugins that can render a view to the editor script.
+	 * Pass the plugins that can render a view, and whether the block may be
+	 * inserted, to the editor script.
+	 *
+	 * @since 1.1.21
+	 * @since 1.1.22 Passes the `inserter` flag.
 	 *
 	 * @return void
 	 */
@@ -98,9 +102,42 @@ class ViewBlock {
 
 		wp_add_inline_script(
 			generate_block_asset_handle( self::NAME, 'editorScript' ),
-			'window.cpViewBlock = ' . wp_json_encode( [ 'plugins' => $plugins ] ) . ';',
+			'window.cpViewBlock = ' . wp_json_encode(
+				[
+					'plugins'  => $plugins,
+					'inserter' => $this->can_insert(),
+				]
+			) . ';',
 			'before'
 		);
+	}
+
+	/**
+	 * Whether the block is offered in the inserter of the current editor.
+	 *
+	 * The block renders only as part of a template for a matching request, so
+	 * it is offered only in the Site Editor, where templates and template parts
+	 * are edited. Elsewhere (post editor, widgets, Customizer) it stays
+	 * registered, so content that already contains it still loads, but it
+	 * cannot be inserted.
+	 *
+	 * @since 1.1.22
+	 *
+	 * @return bool
+	 */
+	protected function can_insert() {
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		$insert = $screen && 'site-editor' === $screen->id;
+
+		/**
+		 * Filters whether the ChurchPlugins view block is offered in the inserter.
+		 *
+		 * @since 1.1.22
+		 *
+		 * @param bool            $insert Whether the block can be inserted.
+		 * @param \WP_Screen|null $screen The current admin screen.
+		 */
+		return (bool) apply_filters( 'cp_view_block_inserter', $insert, $screen );
 	}
 
 	/**
