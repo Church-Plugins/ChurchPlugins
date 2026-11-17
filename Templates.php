@@ -72,6 +72,14 @@ abstract class Templates {
 	protected $block_template_handoff = null;
 
 	/**
+	 * The plugin's human-readable name. Null until read.
+	 *
+	 * @since 1.1.21
+	 * @var string|null
+	 */
+	protected $plugin_name = null;
+
+	/**
 	 * Only make one instance of PostType
 	 *
 	 * @return self
@@ -347,6 +355,27 @@ abstract class Templates {
 	}
 
 	/**
+	 * Get the plugin's human-readable name.
+	 *
+	 * Read from the Plugin Name header of {plugin-path}/{plugin-id}.php, which
+	 * is how ChurchPlugins plugins name their main file; falls back to the id.
+	 *
+	 * @since 1.1.21
+	 *
+	 * @return string
+	 */
+	public function get_plugin_name() {
+		if ( null === $this->plugin_name ) {
+			$file = trailingslashit( $this->get_plugin_path() ) . $this->get_plugin_id() . '.php';
+			$data = is_readable( $file ) ? get_file_data( $file, [ 'name' => 'Plugin Name' ] ) : [];
+
+			$this->plugin_name = ! empty( $data['name'] ) ? $data['name'] : $this->get_plugin_id();
+		}
+
+		return $this->plugin_name;
+	}
+
+	/**
 	 * Get every constructed Templates instance.
 	 *
 	 * @since 1.1.21
@@ -497,7 +526,8 @@ abstract class Templates {
 			$templates[ 'taxonomy-' . $taxonomy ] = sprintf( __( '%s Archive', 'churchplugins' ), $object->labels->singular_name );
 		}
 
-		$content = $this->get_block_template_content();
+		$content     = $this->get_block_template_content();
+		$plugin_name = $this->get_plugin_name();
 
 		foreach ( $templates as $slug => $title ) {
 			$name = $this->get_plugin_id() . '//' . $slug;
@@ -509,9 +539,10 @@ abstract class Templates {
 			register_block_template(
 				$name,
 				[
-					'title'       => $title,
-					/* translators: %s: Plugin id. */
-					'description' => sprintf( __( 'Displays the %s view between the site header and footer.', 'churchplugins' ), $this->get_plugin_id() ),
+					/* translators: 1: Plugin name, 2: Template title. */
+					'title'       => sprintf( __( '%1$s: %2$s', 'churchplugins' ), $plugin_name, $title ),
+					/* translators: %s: Plugin name. */
+					'description' => sprintf( __( 'Displays the %s view between the site header and footer.', 'churchplugins' ), $plugin_name ),
 					'content'     => $content,
 				]
 			);

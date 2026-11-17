@@ -92,7 +92,7 @@ class ViewBlock {
 		foreach ( Templates::get_registered_instances() as $templates ) {
 			$plugins[] = [
 				'value' => $templates->get_plugin_id(),
-				'label' => $templates->get_plugin_id(),
+				'label' => $templates->get_plugin_name(),
 			];
 		}
 
