@@ -1,0 +1,154 @@
+<?php
+/**
+ * The churchplugins/view block.
+ *
+ * @package ChurchPlugins
+ * @since   1.1.21
+ */
+
+namespace ChurchPlugins\Blocks;
+
+use ChurchPlugins\Templates;
+
+// Exit if accessed directly.
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Server-rendered block that prints a plugin's PHP view inside a block template.
+ *
+ * One block serves every ChurchPlugins plugin; the `plugin` attribute holds the
+ * plugin id whose Templates instance renders the view. The newest framework copy
+ * on a site serves all plugins, so a single framework block works for plugin
+ * versions that know nothing about it.
+ *
+ * @since 1.1.21
+ */
+class ViewBlock {
+
+	/**
+	 * Block name.
+	 *
+	 * @var string
+	 */
+	const NAME = 'churchplugins/view';
+
+	/**
+	 * Single instance.
+	 *
+	 * @var self|null
+	 */
+	protected static $instance = null;
+
+	/**
+	 * Get the single instance.
+	 *
+	 * @return self
+	 */
+	public static function get_instance() {
+		if ( null === self::$instance ) {
+			self::$instance = new self();
+		}
+
+		return self::$instance;
+	}
+
+	/**
+	 * Register hooks.
+	 */
+	protected function __construct() {
+		add_action( 'init', [ $this, 'register' ] );
+		add_action( 'enqueue_block_editor_assets', [ $this, 'editor_settings' ] );
+	}
+
+	/**
+	 * Register the block type.
+	 *
+	 * @return void
+	 */
+	public function register() {
+		register_block_type(
+			__DIR__ . '/view',
+			[
+				'render_callback' => [ $this, 'render' ],
+			]
+		);
+	}
+
+	/**
+	 * Pass the plugins that can render a view to the editor script.
+	 *
+	 * @return void
+	 */
+	public function editor_settings() {
+		$plugins = [];
+
+		foreach ( Templates::get_registered_instances() as $templates ) {
+			$plugins[] = [
+				'value' => $templates->get_plugin_id(),
+				'label' => $templates->get_plugin_id(),
+			];
+		}
+
+		wp_add_inline_script(
+			generate_block_asset_handle( self::NAME, 'editorScript' ),
+			'window.cpViewBlock = ' . wp_json_encode( [ 'plugins' => $plugins ] ) . ';',
+			'before'
+		);
+	}
+
+	/**
+	 * Render the plugin view for the current request.
+	 *
+	 * The view runs its own loop over the main query and expects to start
+	 * before the first post, as it did when it rendered ahead of the block
+	 * template. Core renders singular block templates inside a the_post()
+	 * loop, so the query is rewound for the view, and the loop position and
+	 * the global post are restored afterwards; otherwise the view's rewind
+	 * would restart core's loop and the template would render again.
+	 *
+	 * @param array $attributes Block attributes.
+	 * @return string View markup, or an empty string when the request is not for this plugin.
+	 */
+	public function render( $attributes ) {
+		global $wp_query, $post;
+
+		$plugin_id = isset( $attributes['plugin'] ) ? (string) $attributes['plugin'] : '';
+		$templates = Templates::get_plugin_instance( $plugin_id );
+
+		if ( ! $templates || ! $templates->is_cp_query() ) {
+			return '';
+		}
+
+		$previous_post = $post;
+		$current_post  = $wp_query->current_post;
+		$query_post    = $wp_query->post;
+		$in_the_loop   = $wp_query->in_the_loop;
+
+		$wp_query->rewind_posts();
+
+		ob_start();
+		$templates->get_view();
+		$html = ob_get_clean();
+
+		$wp_query->current_post = $current_post;
+		$wp_query->post         = $query_post;
+		$wp_query->in_the_loop  = $in_the_loop;
+
+		if ( $previous_post instanceof \WP_Post ) {
+			$post = $previous_post; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Restores the post the view's loop moved.
+			setup_postdata( $post );
+		} else {
+			wp_reset_postdata();
+		}
+
+		if ( '' === trim( $html ) ) {
+			return '';
+		}
+
+		return sprintf(
+			'<div %1$s>%2$s</div>',
+			get_block_wrapper_attributes( [ 'class' => 'cp-view cp-view--' . sanitize_html_class( $plugin_id ) ] ),
+			$html
+		);
+	}
+}

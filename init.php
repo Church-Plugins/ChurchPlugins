@@ -1,6 +1,6 @@
 <?php
 
-if ( ! class_exists( 'ChurchPlugins_1_1_20', false ) ) {
+if ( ! class_exists( 'ChurchPlugins_1_1_21', false ) ) {
 
 	/**
 	 * Handles checking for and loading the newest version of ChurchPlugins
@@ -11,7 +11,7 @@ if ( ! class_exists( 'ChurchPlugins_1_1_20', false ) ) {
 	 * @package   ChurchPlugins
 	 * @license   GPL-2.0+
 	 */
-	class ChurchPlugins_1_1_20 {
+	class ChurchPlugins_1_1_21 {
 
 		/**
 		 * Registered plugins
@@ -27,7 +27,7 @@ if ( ! class_exists( 'ChurchPlugins_1_1_20', false ) ) {
 		 * @var   string
 		 * @since 1.0.0
 		 */
-		const VERSION = '1.1.20';
+		const VERSION = '1.1.21';
 
 		/**
 		 * Current version hook priority.
@@ -36,12 +36,12 @@ if ( ! class_exists( 'ChurchPlugins_1_1_20', false ) ) {
 		 * @var   int
 		 * @since 1.0.0
 		 */
-		const PRIORITY = 9953;
+		const PRIORITY = 9952;
 
 		/**
 		 * Single instance of the ChurchPlugins object
 		 *
-		 * @var ChurchPlugins_1_1_20
+		 * @var ChurchPlugins_1_1_21
 		 */
 		public static $single_instance = null;
 
@@ -59,7 +59,7 @@ if ( ! class_exists( 'ChurchPlugins_1_1_20', false ) ) {
 		 * Creates/returns the single instance ChurchPlugins object
 		 *
 		 * @since  1.0.0
-		 * @return ChurchPlugins_1_1_20 Single instance object
+		 * @return ChurchPlugins_1_1_21 Single instance object
 		 */
 		public static function initiate() {
 			if ( null === self::$single_instance ) {
@@ -114,6 +114,7 @@ if ( ! class_exists( 'ChurchPlugins_1_1_20', false ) ) {
 			require_once( CHURCHPLUGINS_DIR . 'Helpers.php' );
 			require_once( CHURCHPLUGINS_DIR . 'Logging.php' );
 			require_once( CHURCHPLUGINS_DIR . 'Templates.php' );
+			require_once( CHURCHPLUGINS_DIR . 'Blocks/ViewBlock.php' );
 			require_once( CHURCHPLUGINS_DIR . 'functions.php' );
 
 			require_once( CHURCHPLUGINS_DIR . 'Models/Table.php' );
@@ -137,6 +138,7 @@ if ( ! class_exists( 'ChurchPlugins_1_1_20', false ) ) {
 			$this->admin = ChurchPlugins\Admin\_Init::get_instance();
 
 			ChurchPlugins\Integrations\CMB2\Init::get_instance();
+			ChurchPlugins\Blocks\ViewBlock::get_instance();
 
 			do_action( 'cp_core_loaded' );
 		}
@@ -178,6 +180,6 @@ if ( ! class_exists( 'ChurchPlugins_1_1_20', false ) ) {
 		}
 	}
 
-	return ChurchPlugins_1_1_20::initiate();
+	return ChurchPlugins_1_1_21::initiate();
 
 }// End if().

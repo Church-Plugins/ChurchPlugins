@@ -1,0 +1,23 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "churchplugins/view",
+	"title": "ChurchPlugins View",
+	"category": "theme",
+	"icon": "layout",
+	"description": "Displays the ChurchPlugins view (sermon, series, group, staff, etc.) for the page being viewed. Use it in single, archive and taxonomy templates.",
+	"textdomain": "churchplugins",
+	"attributes": {
+		"plugin": {
+			"type": "string",
+			"default": ""
+		}
+	},
+	"supports": {
+		"html": false,
+		"multiple": false,
+		"reusable": false,
+		"align": [ "wide", "full" ]
+	},
+	"editorScript": "file:./index.js"
+}
