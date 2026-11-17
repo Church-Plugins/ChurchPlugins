@@ -17,6 +17,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 abstract class Templates {
 
 	/**
+	 * Framework version every active plugin must bundle for the block template
+	 * handoff to be on by default.
+	 *
+	 * @since 1.1.21
+	 */
+	const BLOCK_TEMPLATES_VERSION = '1.1.21';
+
+	/**
 	 * @var self
 	 */
 	protected static $_instance;
@@ -368,12 +376,52 @@ abstract class Templates {
 	}
 
 	/**
+	 * Lowest ChurchPlugins framework version bundled by the active plugins.
+	 *
+	 * Each active plugin loads its bundled copy's versioned loader class, so
+	 * the declared ChurchPlugins_* classes cover every copy that could serve
+	 * the site if the plugins carrying newer copies were deactivated.
+	 *
+	 * @since 1.1.21
+	 *
+	 * @return string
+	 */
+	public static function get_lowest_framework_version() {
+		static $lowest = null;
+
+		if ( null !== $lowest ) {
+			return $lowest;
+		}
+
+		$lowest = CHURCHPLUGINS_VERSION;
+
+		foreach ( get_declared_classes() as $class ) {
+			if ( 0 !== strpos( $class, 'ChurchPlugins_' ) || ! defined( $class . '::VERSION' ) ) {
+				continue;
+			}
+
+			$version = (string) constant( $class . '::VERSION' );
+
+			if ( version_compare( $version, $lowest, '<' ) ) {
+				$lowest = $version;
+			}
+		}
+
+		return $lowest;
+	}
+
+	/**
 	 * Whether this plugin's pages are rendered through block templates.
 	 *
-	 * True on block themes (WordPress 6.7+) unless the theme overrides the
-	 * plugin's default-template.php or the `cp_block_template_handoff` filter
-	 * returns false. An override was written to replace the whole block
-	 * template, and may print block markup that only the legacy path parses.
+	 * On by default on block themes (WordPress 6.7+) only when every active
+	 * ChurchPlugins plugin bundles a framework that supports the handoff. A
+	 * template customized in the Site Editor stores the churchplugins/view
+	 * block, which older framework copies do not register; if such a copy
+	 * took over the site, the customized template would render empty.
+	 *
+	 * Also off when the theme overrides the plugin's default-template.php: an
+	 * override was written to replace the whole block template, and may print
+	 * block markup that only the legacy path parses.
 	 *
 	 * @since 1.1.21
 	 *
@@ -384,14 +432,17 @@ abstract class Templates {
 			return false;
 		}
 
-		$enabled = ! locate_template( $this->get_plugin_id() . '/default-template.php' );
+		$enabled = version_compare( self::get_lowest_framework_version(), self::BLOCK_TEMPLATES_VERSION, '>=' )
+			&& ! locate_template( $this->get_plugin_id() . '/default-template.php' );
 
 		/**
 		 * Whether to render this plugin's pages through the block template hierarchy.
 		 *
 		 * Return false to keep the legacy behavior on block themes: no registered
 		 * block templates, and the plugin's default-template.php replaces the
-		 * resolved block template.
+		 * resolved block template. Return true to opt in while an active plugin
+		 * still bundles an older framework, accepting that templates customized
+		 * in the Site Editor render empty if that older copy ever serves the site.
 		 *
 		 * @since 1.1.21
 		 *
