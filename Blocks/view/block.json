@@ -2,10 +2,11 @@
 	"$schema": "https://schemas.wp.org/trunk/block.json",
 	"apiVersion": 3,
 	"name": "churchplugins/view",
-	"title": "ChurchPlugins View",
+	"title": "Church Plugins Content",
 	"category": "theme",
 	"icon": "layout",
-	"description": "Displays the ChurchPlugins view (sermon, series, group, staff, etc.) for the page being viewed. Use it in single, archive and taxonomy templates.",
+	"description": "Shows the sermon, series, group, staff member or other Church Plugins content for the page a visitor is on. Use it in a template in the Site Editor.",
+	"keywords": [ "sermon", "series", "group", "staff", "church" ],
 	"textdomain": "churchplugins",
 	"attributes": {
 		"plugin": {

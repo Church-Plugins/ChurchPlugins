@@ -417,12 +417,18 @@ abstract class Templates {
 	}
 
 	/**
-	 * Get the plugin's human-readable name.
+	 * Get the plugin's human-readable name, as shown to site admins in the
+	 * view block's dropdown and the Site Editor's template titles.
 	 *
-	 * Read from the Plugin Name header of {plugin-path}/{plugin-id}.php, which
-	 * is how ChurchPlugins plugins name their main file; falls back to the id.
+	 * Defaults to the Plugin Name header of {plugin-path}/{plugin-id}.php,
+	 * which is how ChurchPlugins plugins name their main file, or the id. A
+	 * plugin whose product name differs from its header overrides this method
+	 * in its Templates subclass (returning a translated string), or anyone can
+	 * use the `cp_template_plugin_name` filter. Template titles are registered
+	 * on `init` (priority 99), so either must be in place before then.
 	 *
 	 * @since 1.1.21
+	 * @since 1.1.22 Added the `cp_template_plugin_name` filter.
 	 *
 	 * @return string
 	 */
@@ -434,7 +440,15 @@ abstract class Templates {
 			$this->plugin_name = ! empty( $data['name'] ) ? $data['name'] : $this->get_plugin_id();
 		}
 
-		return $this->plugin_name;
+		/**
+		 * Filters the plugin name shown to site admins for a ChurchPlugins plugin.
+		 *
+		 * @since 1.1.22
+		 *
+		 * @param string    $name      Plugin name; the plugin header's by default.
+		 * @param Templates $templates The plugin's Templates instance.
+		 */
+		return (string) apply_filters( 'cp_template_plugin_name', $this->plugin_name, $this );
 	}
 
 	/**
@@ -568,12 +582,20 @@ abstract class Templates {
 				continue;
 			}
 
-			/* translators: %s: Post type singular name. */
-			$templates[ 'single-' . $post_type ] = sprintf( __( 'Single %s', 'churchplugins' ), $object->labels->singular_name );
+			$templates[ 'single-' . $post_type ] = [
+				/* translators: %s: Post type singular name, e.g. "Sermon". */
+				sprintf( __( 'Single %s', 'churchplugins' ), $object->labels->singular_name ),
+				/* translators: %s: Post type singular name, e.g. "Sermon". */
+				sprintf( __( 'Controls the page for each %s.', 'churchplugins' ), $object->labels->singular_name ),
+			];
 
 			if ( $object->has_archive ) {
-				/* translators: %s: Post type plural name. */
-				$templates[ 'archive-' . $post_type ] = sprintf( __( '%s Archive', 'churchplugins' ), $object->labels->name );
+				$templates[ 'archive-' . $post_type ] = [
+					/* translators: %s: Post type plural name, e.g. "Sermons". */
+					sprintf( __( '%s Archive', 'churchplugins' ), $object->labels->name ),
+					/* translators: %s: Post type plural name, e.g. "Sermons". */
+					sprintf( __( 'Controls the page that lists all %s.', 'churchplugins' ), $object->labels->name ),
+				];
 			}
 		}
 
@@ -584,14 +606,13 @@ abstract class Templates {
 				continue;
 			}
 
-			/* translators: %s: Taxonomy singular name. */
-			$templates[ 'taxonomy-' . $taxonomy ] = sprintf( __( '%s Archive', 'churchplugins' ), $object->labels->singular_name );
+			$templates[ 'taxonomy-' . $taxonomy ] = $this->get_taxonomy_template_labels( $object );
 		}
 
 		$content     = $this->get_block_template_content();
 		$plugin_name = $this->get_plugin_name();
 
-		foreach ( $templates as $slug => $title ) {
+		foreach ( $templates as $slug => list( $title, $description ) ) {
 			$name = $this->get_plugin_id() . '//' . $slug;
 
 			if ( \WP_Block_Templates_Registry::get_instance()->is_registered( $name ) ) {
@@ -601,14 +622,58 @@ abstract class Templates {
 			register_block_template(
 				$name,
 				[
-					/* translators: 1: Plugin name, 2: Template title. */
+					/* translators: 1: Plugin name, e.g. "CP Sermons", 2: Template title, e.g. "Single Sermon". */
 					'title'       => sprintf( __( '%1$s: %2$s', 'churchplugins' ), $plugin_name, $title ),
-					/* translators: %s: Plugin name. */
-					'description' => sprintf( __( 'Displays the %s view between the site header and footer.', 'churchplugins' ), $plugin_name ),
+					'description' => $description,
 					'content'     => $content,
 				]
 			);
 		}
+	}
+
+	/**
+	 * Title and description of a taxonomy's registered template.
+	 *
+	 * Taxonomy labels are often generic ("Type", "Category"), so the title
+	 * names the post type the taxonomy belongs to when its label does not
+	 * already ("Group Type Archive"), and the description says what the page
+	 * lists ("Controls the page that lists the Groups in one Type.").
+	 *
+	 * @since 1.1.22
+	 *
+	 * @param \WP_Taxonomy $taxonomy Taxonomy object.
+	 * @return string[] Title and description.
+	 */
+	protected function get_taxonomy_template_labels( $taxonomy ) {
+		$singular   = $taxonomy->labels->singular_name;
+		$post_types = array_values( array_intersect( (array) $taxonomy->object_type, (array) $this->get_post_types() ) );
+		$post_types = array_filter( array_map( 'get_post_type_object', $post_types ? $post_types : (array) $taxonomy->object_type ) );
+		$owner      = 1 === count( $post_types ) ? reset( $post_types ) : null;
+
+		if ( ! $owner ) {
+			$listed = $post_types
+				? wp_sprintf( '%l', wp_list_pluck( $post_types, 'label' ) )
+				: __( 'items', 'churchplugins' );
+
+			return [
+				/* translators: %s: Taxonomy singular name, e.g. "Topic". */
+				sprintf( __( '%s Archive', 'churchplugins' ), $singular ),
+				/* translators: 1: Post type plural names, e.g. "Sermons and Series", 2: Taxonomy singular name, e.g. "Topic". */
+				sprintf( __( 'Controls the page that lists the %1$s in one %2$s.', 'churchplugins' ), $listed, $singular ),
+			];
+		}
+
+		$title = false !== stripos( $singular, $owner->labels->singular_name )
+			/* translators: %s: Taxonomy singular name, e.g. "Group Type". */
+			? sprintf( __( '%s Archive', 'churchplugins' ), $singular )
+			/* translators: 1: Post type singular name, e.g. "Group", 2: Taxonomy singular name, e.g. "Type". */
+			: sprintf( __( '%1$s %2$s Archive', 'churchplugins' ), $owner->labels->singular_name, $singular );
+
+		return [
+			$title,
+			/* translators: 1: Post type plural name, e.g. "Groups", 2: Taxonomy singular name, e.g. "Type". */
+			sprintf( __( 'Controls the page that lists the %1$s in one %2$s.', 'churchplugins' ), $owner->labels->name, $singular ),
+		];
 	}
 
 	/**

@@ -129,7 +129,7 @@
 					blockProps,
 					el( Placeholder, {
 						icon: 'layout',
-						label: __( 'ChurchPlugins View', 'churchplugins' ),
+						label: __( 'Church Plugins Content', 'churchplugins' ),
 						instructions: __(
 							'This block only works in a template in the Site Editor. In a post, page or pattern it displays nothing on your site, so you can remove it.',
 							'churchplugins'
@@ -199,7 +199,7 @@
 					Placeholder,
 					{
 						icon: 'layout',
-						label: __( 'ChurchPlugins View', 'churchplugins' ),
+						label: __( 'Church Plugins Content', 'churchplugins' ),
 						instructions,
 					},
 					el( PluginSelect, { value: attributes.plugin, options, onChange } )
