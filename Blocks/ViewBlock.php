@@ -40,6 +40,13 @@ class ViewBlock {
 	protected static $instance = null;
 
 	/**
+	 * Whether a view is being rendered.
+	 *
+	 * @var bool
+	 */
+	protected static $rendering = false;
+
+	/**
 	 * Get the single instance.
 	 *
 	 * @return self
@@ -99,6 +106,12 @@ class ViewBlock {
 	/**
 	 * Render the plugin view for the current request.
 	 *
+	 * The block renders only as part of a template: inside post content (the
+	 * `the_content` filter, which the views themselves call) it prints nothing,
+	 * so a block placed in a post or a pattern cannot render the view, which
+	 * renders the content, which renders the block again. A re-entrancy guard
+	 * covers any other nesting.
+	 *
 	 * The view runs its own loop over the main query and expects to start
 	 * before the first post, as it did when it rendered ahead of the block
 	 * template. Core renders singular block templates inside a the_post()
@@ -112,6 +125,10 @@ class ViewBlock {
 	public function render( $attributes ) {
 		global $wp_query, $post;
 
+		if ( self::$rendering || doing_filter( 'the_content' ) ) {
+			return '';
+		}
+
 		$plugin_id = isset( $attributes['plugin'] ) ? (string) $attributes['plugin'] : '';
 		$templates = Templates::get_plugin_instance( $plugin_id );
 
@@ -123,22 +140,35 @@ class ViewBlock {
 		$current_post  = $wp_query->current_post;
 		$query_post    = $wp_query->post;
 		$in_the_loop   = $wp_query->in_the_loop;
+		$buffer_level  = ob_get_level();
+		$html          = '';
 
-		$wp_query->rewind_posts();
+		self::$rendering = true;
 
-		ob_start();
-		$templates->get_view();
-		$html = ob_get_clean();
+		try {
+			$wp_query->rewind_posts();
 
-		$wp_query->current_post = $current_post;
-		$wp_query->post         = $query_post;
-		$wp_query->in_the_loop  = $in_the_loop;
+			ob_start();
+			$templates->get_view();
+			$html = ob_get_clean();
+		} finally {
+			// Close the view's buffer, and any it left open, even when it throws.
+			while ( ob_get_level() > $buffer_level ) {
+				ob_end_clean();
+			}
 
-		if ( $previous_post instanceof \WP_Post ) {
-			$post = $previous_post; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Restores the post the view's loop moved.
-			setup_postdata( $post );
-		} else {
-			wp_reset_postdata();
+			$wp_query->current_post = $current_post;
+			$wp_query->post         = $query_post;
+			$wp_query->in_the_loop  = $in_the_loop;
+
+			if ( $previous_post instanceof \WP_Post ) {
+				$post = $previous_post; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Restores the post the view's loop moved.
+				setup_postdata( $post );
+			} else {
+				wp_reset_postdata();
+			}
+
+			self::$rendering = false;
 		}
 
 		if ( '' === trim( $html ) ) {
