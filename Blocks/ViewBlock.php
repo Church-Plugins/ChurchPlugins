@@ -85,8 +85,13 @@ class ViewBlock {
 	 * Pass the plugins that can render a view, and whether the block may be
 	 * inserted, to the editor script.
 	 *
+	 * Only plugins that own post types or taxonomies on this request are
+	 * listed, with those types, so the editor can offer the ones that match
+	 * the template being edited. A plugin without any has no view to show.
+	 *
 	 * @since 1.1.21
-	 * @since 1.1.22 Passes the `inserter` flag.
+	 * @since 1.1.22 Passes the `inserter` flag; lists only plugins with post
+	 *               types or taxonomies, with those types.
 	 *
 	 * @return void
 	 */
@@ -94,9 +99,18 @@ class ViewBlock {
 		$plugins = [];
 
 		foreach ( Templates::get_registered_instances() as $templates ) {
+			$post_types = array_values( array_filter( (array) $templates->get_post_types() ) );
+			$taxonomies = array_values( array_filter( (array) $templates->get_taxonomies() ) );
+
+			if ( ! $post_types && ! $taxonomies ) {
+				continue;
+			}
+
 			$plugins[] = [
-				'value' => $templates->get_plugin_id(),
-				'label' => $templates->get_plugin_name(),
+				'value'      => $templates->get_plugin_id(),
+				'label'      => $templates->get_plugin_name(),
+				'postTypes'  => $post_types,
+				'taxonomies' => $taxonomies,
 			];
 		}
 
