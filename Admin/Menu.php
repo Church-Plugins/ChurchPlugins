@@ -13,14 +13,44 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Shared "Church Plugins" parent menu.
  *
- * Church Plugins products can opt into a single shared top-level menu instead
- * of each registering their own. A product declares support with
- * {@see Menu::add_support()} (typically during its setup, before `admin_menu`
- * fires); the parent menu is only registered when at least one product has
- * declared support. Products then attach their own screens as submenus using
- * {@see Menu::get_slug()} as the parent slug.
+ * Since 1.1.23 every Church Plugins product's screens live under this one
+ * menu, whether or not the product calls anything here:
+ *
+ *   Church Plugins
+ *     Home               (CP Essentials, planned)
+ *     Messages           tabs: Messages · Series · Speakers · Topics · … · Tools
+ *     Events             (CP Essentials)
+ *     Groups             tabs: Groups · Types · Categories · Life Stages
+ *     Staff              tabs: Staff · Departments
+ *     Locations · Resources · Notification Bars
+ *     Church Info        (CP Essentials)
+ *     Sync               (CP Sync)
+ *     Settings           a tab per product (each product's own tabs below)
+ *     Licenses           a row per paid product
+ *
+ * How: products keep registering their post types and pages exactly as
+ * before. On `admin_menu` (priority 998) the framework removes each
+ * product's top-level menu and adds one entry for it here. The old submenu
+ * arrays stay in place, so every screen keeps its URL, hook suffix and
+ * capability check; their items become tabs across the top of the area's
+ * screens. Settings pages that were in WordPress's Settings menu are hidden
+ * there and reached from Settings. See {@see MenuLayout} for the rules.
+ *
+ * Because the newest framework copy serves every product on a site, this
+ * also moves products that were never updated for it.
+ *
+ * Filters:
+ * - `cp_admin_shared_menu`      false keeps the old layout (opt-out).
+ * - `cp_admin_products`         the product table.
+ * - `cp_admin_menu_capability`  capability of the parent (default
+ *                               `edit_posts` while it holds content, else
+ *                               `manage_options`).
+ * - `cp_admin_menu_position`    position (26 while it holds content, else 80).
+ * - `cp_admin_area_tabs`        tabs of an area.
+ * - `cp_admin_settings_tabs`    tabs of the Settings screen.
  *
  * @since 1.1.16
+ * @since 1.1.23 Hosts every product's screens.
  */
 class Menu {
 
@@ -39,11 +69,71 @@ class Menu {
 	const SLUG = 'church-plugins';
 
 	/**
+	 * Slug of the Licenses screen the framework provides.
+	 *
+	 * @since 1.1.23
+	 * @var string
+	 */
+	const LICENSES_SLUG = 'cp-licenses';
+
+	/**
+	 * Settings screen hosted by CP Essentials, when it registers one.
+	 *
+	 * @since 1.1.23
+	 * @var string
+	 */
+	const ESSENTIALS_SETTINGS = 'cp-essentials-settings';
+
+	/**
+	 * Position of the menu while it holds content screens (under Pages and
+	 * Comments, as CP Essentials places it).
+	 *
+	 * @since 1.1.23
+	 * @var int
+	 */
+	const CONTENT_POSITION = 26;
+
+	/**
 	 * Whether at least one product has declared support for the shared menu.
 	 *
 	 * @var bool
 	 */
 	protected $has_support = false;
+
+	/**
+	 * Areas moved under the shared menu this request.
+	 *
+	 * @var array<string, array>
+	 */
+	protected $areas = array();
+
+	/**
+	 * Slug of the Settings entry ('' when there is none).
+	 *
+	 * @var string
+	 */
+	protected $settings_entry = '';
+
+	/**
+	 * Settings tabs this request, cached once the menu is built.
+	 *
+	 * @var array|null
+	 */
+	protected $settings_tabs = null;
+
+	/**
+	 * Whether the screen being printed is one of the moved screens.
+	 *
+	 * @var bool
+	 */
+	protected $is_ours = false;
+
+	/**
+	 * Parent mappings to undo after the menu is printed.
+	 *
+	 * @var array|null
+	 */
+	protected $restore = null;
 
 	/**
 	 * Get the single instance.
@@ -63,24 +153,33 @@ class Menu {
 	 * adding submenus at the default priority (10) can attach to it.
 	 */
 	protected function __construct() {
-		add_action( 'admin_menu', [ $this, 'register_menu' ], 9 );
+		add_action( 'admin_menu', array( $this, 'register_menu' ), 9 );
+		add_action( 'admin_menu', array( $this, 'relocate' ), 998 );
 		// After all products have attached their submenus (default priority 10),
-		// drop the self-referential parent item so the menu points at the first
-		// product instead of an empty landing page.
-		add_action( 'admin_menu', [ $this, 'remove_parent_submenu' ], 999 );
+		// drop the self-referential parent item and put entries in order.
+		add_action( 'admin_menu', array( $this, 'remove_parent_submenu' ), 999 );
+
+		add_filter( 'parent_file', array( $this, 'parent_file' ), 20 );
+		add_filter( 'submenu_file', array( $this, 'submenu_file' ), 20, 2 );
+		add_filter( 'cp_essentials_menu_order', array( $this, 'essentials_order' ), 20 );
+		add_action( 'admin_init', array( $this, 'redirect_old_settings_screens' ), 1 );
+		add_action( 'all_admin_notices', array( $this, 'tabs' ), 5 );
+		add_action( 'admin_enqueue_scripts', array( $this, 'styles' ) );
+		add_filter( 'admin_body_class', array( $this, 'body_class' ) );
 	}
 
 	/**
 	 * Declare support for the shared Church Plugins menu.
 	 *
-	 * Call before `admin_menu` fires (e.g. during plugin setup on
-	 * `cp_core_loaded`). Instantiating the singleton registers the parent menu.
+	 * Since 1.1.23 products do not need to call this: the framework moves
+	 * every product's screens here. Calling it still makes sure the parent
+	 * exists for a product that adds its own submenu (CP Sync).
 	 *
 	 * @return string The parent menu slug, for use as a submenu parent.
 	 * @since 1.1.16
 	 */
 	public static function add_support() {
-		$instance = self::get_instance();
+		$instance              = self::get_instance();
 		$instance->has_support = true;
 
 		return self::SLUG;
@@ -107,27 +206,175 @@ class Menu {
 	}
 
 	/**
+	 * Whether products' screens move under the shared menu.
+	 *
+	 * Returning false from `cp_admin_shared_menu` keeps the layout of
+	 * framework 1.1.22 and earlier: each product keeps its own top-level
+	 * menu, settings and License tab. It is meant as a one-release escape
+	 * hatch and will be removed.
+	 *
+	 * @return bool
+	 * @since 1.1.23
+	 */
+	public static function enabled() {
+		/**
+		 * Whether Church Plugins products' screens move under the shared menu.
+		 *
+		 * @param bool $enabled Default true.
+		 * @since 1.1.23
+		 */
+		return (bool) apply_filters( 'cp_admin_shared_menu', true );
+	}
+
+	/**
+	 * The products the shared menu knows about.
+	 *
+	 * Known here (rather than declared by each product) so that products
+	 * which were never updated for the shared menu still move.
+	 *
+	 * - `name`        product name.
+	 * - `position`    slot in the menu (see {@see MenuLayout::fixed_slots()}).
+	 * - `post_types`  post types whose top-level menu becomes the area, in
+	 *                 order of preference (the first with a top-level menu).
+	 * - `label_type`  post type whose plural label names the product's
+	 *                 Settings tab (custom labels apply).
+	 * - `settings`    slug of the product's main settings page.
+	 * - `settings_label` Settings tab label when there is no `label_type`.
+	 * - `menu`        slug of a page the product adds to the shared menu itself.
+	 * - `menu_label`  label for that entry.
+	 * - `taxonomies`  taxonomies the product owns: shown as tabs in its own
+	 *                 area only, even when attached to other products' types.
+	 *
+	 * @return array<string, array>
+	 * @since 1.1.23
+	 */
+	public static function products() {
+		$products = array(
+			'cp-library'           => array(
+				'name'       => 'CP Sermons',
+				'position'   => 10,
+				'post_types' => array( 'cpl_item_type', 'cpl_item' ),
+				'label_type' => 'cpl_item',
+				'settings'   => 'cpl_main_options',
+			),
+			'cp-groups'            => array(
+				'name'       => 'CP Groups',
+				'position'   => 30,
+				'post_types' => array( 'cp_group' ),
+				'label_type' => 'cp_group',
+				'settings'   => 'cp_groups_main_options',
+			),
+			'cp-staff'             => array(
+				'name'       => 'CP Staff',
+				'position'   => 40,
+				'post_types' => array( 'cp_staff' ),
+				'label_type' => 'cp_staff',
+				'settings'   => 'cp_staff_staff_options',
+			),
+			'cp-locations'         => array(
+				'name'       => 'CP Locations',
+				'position'   => 50,
+				'post_types' => array( 'cploc_location' ),
+				'label_type' => 'cploc_location',
+				'settings'   => 'cploc_main_options',
+			),
+			'cp-resources'         => array(
+				'name'       => 'CP Resources',
+				'position'   => 60,
+				'post_types' => array( 'cp_resource' ),
+				'label_type' => 'cp_resource',
+				'settings'   => 'cp_resources_main_options',
+				'taxonomies' => array( 'cp_resource_type', 'cp_resource_topic' ),
+			),
+			'cp-notification-bars' => array(
+				'name'       => 'CP Notification Bars',
+				'position'   => 70,
+				'post_types' => array( 'cp_notification_bar' ),
+				'label_type' => 'cp_notification_bar',
+				'settings'   => 'cp_notification_bars_main_options',
+			),
+			'cp-live'              => array(
+				'name'           => 'CP Live',
+				'position'       => 75,
+				'settings'       => 'cp_live_main_options',
+				'settings_label' => __( 'Live', 'churchplugins' ),
+			),
+			'cp-sync'              => array(
+				'name'       => 'CP Sync',
+				'position'   => 90,
+				'menu'       => 'cps_settings',
+				'menu_label' => __( 'Sync', 'churchplugins' ),
+			),
+			'cp-connect'           => array(
+				'name'           => 'CP Connect',
+				'position'       => 92,
+				'settings'       => 'cpc_main_options',
+				'settings_label' => __( 'Connect', 'churchplugins' ),
+			),
+		);
+
+		/**
+		 * Filters the products the shared menu knows about.
+		 *
+		 * @param array $products key => { name, position, post_types?, label_type?, settings?, settings_label?, menu?, menu_label? }.
+		 * @since 1.1.23
+		 */
+		$products = apply_filters( 'cp_admin_products', $products );
+
+		return is_array( $products ) ? $products : array();
+	}
+
+	/**
+	 * Post types registered through the framework's PostType class.
+	 *
+	 * @return string[]
+	 */
+	protected static function cp_post_types() {
+		$class = '\ChurchPlugins\Setup\PostTypes\PostType';
+
+		return class_exists( $class ) && method_exists( $class, 'registered_post_types' ) ? $class::registered_post_types() : array();
+	}
+
+	/**
+	 * Areas that would move, from the current top-level menu.
+	 *
+	 * @return array<string, array>
+	 */
+	protected function plan() {
+		global $menu;
+
+		if ( ! self::enabled() ) {
+			return array();
+		}
+
+		return MenuLayout::plan_areas( (array) $menu, self::products(), self::cp_post_types() );
+	}
+
+	/**
 	 * Register the top-level Church Plugins menu.
 	 *
-	 * Only registers when a product has declared support. The menu has no page
-	 * callback of its own; the landing page is the first submenu a product
-	 * attaches.
+	 * Registered when a product declared support, or when there is anything
+	 * to move here: a product's content screens or a license.
 	 *
 	 * @return void
 	 * @since 1.1.16
 	 */
 	public function register_menu() {
-		if ( ! $this->has_support ) {
+		$content = (bool) $this->plan();
+
+		if ( ! $this->has_support && ! $content && ! ( self::enabled() && Licenses::has_any() ) ) {
 			return;
 		}
 
 		/**
 		 * Filters the capability required to see the Church Plugins menu.
 		 *
-		 * @param string $capability The capability. Default 'manage_options'.
+		 * @param string $capability The capability. Default 'edit_posts' while the menu
+		 *                           holds content screens, else 'manage_options'.
 		 * @since 1.1.16
+		 * @since 1.1.23 Defaults to 'edit_posts' while the menu holds content screens.
 		 */
-		$capability = apply_filters( 'cp_admin_menu_capability', 'manage_options' );
+		$capability = apply_filters( 'cp_admin_menu_capability', $content ? 'edit_posts' : 'manage_options' );
 
 		add_menu_page(
 			__( 'Church Plugins', 'churchplugins' ),
@@ -139,43 +386,835 @@ class Menu {
 			/**
 			 * Filters the position of the Church Plugins menu.
 			 *
-			 * @param int|float $position The menu position. Default 80.
+			 * @param int|float $position The menu position. Default 26 while the menu
+			 *                            holds content screens (under Pages and
+			 *                            Comments), else 80.
 			 * @since 1.1.16
+			 * @since 1.1.23 Defaults to 26 while the menu holds content screens.
 			 */
-			apply_filters( 'cp_admin_menu_position', 80 )
+			apply_filters( 'cp_admin_menu_position', $content ? self::CONTENT_POSITION : 80 )
 		);
 	}
 
 	/**
-	 * Remove the self-referential parent submenu item.
+	 * Whether the parent menu was registered this request.
 	 *
-	 * When the first submenu is added to a parent that has no page of its own,
-	 * core's add_submenu_page() inserts a first submenu item that links back to
-	 * the parent slug (an empty page). Removing it makes the top-level menu link
-	 * to the first product that registered a submenu.
+	 * @return bool
+	 */
+	protected static function parent_registered() {
+		global $menu;
+
+		foreach ( (array) $menu as $item ) {
+			if ( isset( $item[2] ) && self::SLUG === $item[2] ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Move products' screens under the shared menu.
 	 *
 	 * @return void
-	 * @since 1.1.16
+	 * @since 1.1.23
 	 */
-	public function remove_parent_submenu() {
-		if ( ! $this->has_support ) {
+	public function relocate() {
+		global $menu, $submenu, $_wp_real_parent_file;
+
+		if ( ! self::enabled() || ! self::parent_registered() ) {
 			return;
 		}
 
+		$this->areas = $this->plan();
+
+		list( $menu, $submenu ) = MenuLayout::apply_areas( (array) $menu, (array) $submenu, $this->areas ); // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Moving menus is the point.
+
+		$this->relabel_product_entries();
+
+		Licenses::get_instance()->prepare_menu();
+
+		$this->settings_tabs  = null;
+		$this->settings_entry = '';
+		$tabs                 = $this->settings_tabs();
+
+		// Hide each product's settings page from the menu it was in (for
+		// example WordPress's Settings menu); it is reached from Settings now.
+		$real = is_array( $_wp_real_parent_file ) ? $_wp_real_parent_file : array();
+
+		foreach ( $tabs as $tab ) {
+			// CP Essentials' Settings screen is the Settings entry itself.
+			if ( empty( $tab['parent'] ) || empty( $tab['slug'] ) || self::ESSENTIALS_SETTINGS === $tab['slug'] ) {
+				continue;
+			}
+
+			if ( ! $this->is_visible_parent( $tab['parent'] ) ) {
+				continue;
+			}
+
+			list( $submenu, $real ) = MenuLayout::hide_item( (array) $submenu, $real, $tab['parent'], $tab['slug'] ); // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
+		}
+
+		$_wp_real_parent_file = $real; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
+
+		$this->add_settings_entry( $tabs );
+
+		Licenses::get_instance()->add_page();
+	}
+
+	/**
+	 * Send a product settings page opened through a WordPress menu file
+	 * (CP Live's old `options-general.php?page=cp_live_main_options`) to the
+	 * same page under admin.php. Both addresses open the same page; under
+	 * options-general.php core would open WordPress's Settings menu.
+	 *
+	 * @return void
+	 * @since 1.1.23
+	 */
+	public function redirect_old_settings_screens() {
+		global $pagenow;
+
+		if ( ! self::enabled() || wp_doing_ajax() || in_array( $pagenow, array( 'admin.php', 'edit.php', 'admin-post.php' ), true ) ) {
+			return;
+		}
+
+		$method = isset( $_SERVER['REQUEST_METHOD'] ) ? strtoupper( sanitize_text_field( wp_unslash( $_SERVER['REQUEST_METHOD'] ) ) ) : 'GET';
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Only reads which screen was asked for.
+		$page = isset( $_GET['page'] ) && is_string( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
+
+		if ( 'GET' !== $method || '' === $page ) {
+			return;
+		}
+
+		$slugs = array();
+
+		foreach ( self::products() as $product ) {
+			if ( ! empty( $product['settings'] ) ) {
+				$slugs[] = (string) $product['settings'];
+			}
+		}
+
+		if ( ! in_array( $page, $slugs, true ) ) {
+			return;
+		}
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Passed through to the same screen; add_query_arg() encodes it.
+		$query = wp_unslash( $_GET );
+
+		wp_safe_redirect( add_query_arg( array_map( 'rawurlencode', array_filter( $query, 'is_string' ) ), admin_url( 'admin.php' ) ) );
+		exit;
+	}
+
+	/**
+	 * Whether a submenu parent is printed in the menu (a top-level item, or
+	 * the shared parent itself).
+	 *
+	 * @param string $parent Parent slug.
+	 * @return bool
+	 */
+	protected function is_visible_parent( $parent ) {
+		global $menu;
+
+		foreach ( (array) $menu as $item ) {
+			if ( isset( $item[2] ) && $parent === $item[2] ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Give product entries that a product adds itself their menu label
+	 * (CP Sync's "CP Sync" becomes "Sync").
+	 *
+	 * @return void
+	 */
+	protected function relabel_product_entries() {
 		global $submenu;
 
 		if ( empty( $submenu[ self::SLUG ] ) ) {
 			return;
 		}
 
-		foreach ( $submenu[ self::SLUG ] as $index => $item ) {
-			if ( isset( $item[2] ) && self::SLUG === $item[2] ) {
-				unset( $submenu[ self::SLUG ][ $index ] );
+		foreach ( self::products() as $product ) {
+			if ( empty( $product['menu'] ) || empty( $product['menu_label'] ) ) {
+				continue;
+			}
+
+			foreach ( $submenu[ self::SLUG ] as $index => $item ) {
+				if ( isset( $item[2] ) && $product['menu'] === $item[2] ) {
+					$submenu[ self::SLUG ][ $index ][0] = $product['menu_label']; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
+				}
+			}
+		}
+	}
+
+	/**
+	 * Add the Settings entry: CP Essentials' Settings screen when it has one,
+	 * else a link to the first product's settings.
+	 *
+	 * @param array $tabs Settings tabs.
+	 * @return void
+	 */
+	protected function add_settings_entry( array $tabs ) {
+		global $submenu;
+
+		foreach ( (array) ( isset( $submenu[ self::SLUG ] ) ? $submenu[ self::SLUG ] : array() ) as $item ) {
+			if ( isset( $item[2] ) && self::ESSENTIALS_SETTINGS === $item[2] ) {
+				$this->settings_entry = self::ESSENTIALS_SETTINGS;
+				return;
 			}
 		}
 
-		// Reindex so the first remaining product becomes the menu's landing page.
-		$submenu[ self::SLUG ] = array_values( $submenu[ self::SLUG ] );
+		if ( ! $tabs ) {
+			return;
+		}
+
+		$first = reset( $tabs );
+
+		$this->settings_entry       = $first['path'];
+		$submenu[ self::SLUG ][]    = array( __( 'Settings', 'churchplugins' ), $first['capability'], $first['path'], __( 'Settings', 'churchplugins' ) ); // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
+	}
+
+	/**
+	 * Find a submenu item by slug anywhere in $submenu.
+	 *
+	 * @param string $slug Item slug.
+	 * @return array{parent: string, item: array}|null
+	 */
+	protected static function find_item( $slug ) {
+		global $submenu, $_wp_real_parent_file;
+
+		foreach ( (array) $submenu as $parent => $items ) {
+			foreach ( (array) $items as $item ) {
+				if ( isset( $item[2] ) && (string) $slug === (string) $item[2] ) {
+					$parent = (string) $parent;
+
+					if ( 0 === strpos( $parent, MenuLayout::HOLDER_PREFIX ) && isset( $_wp_real_parent_file[ $parent ] ) ) {
+						$parent = $_wp_real_parent_file[ $parent ];
+					}
+
+					return array(
+						'parent' => $parent,
+						'item'   => $item,
+					);
+				}
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Tabs of the Settings screen: one per product with settings, each
+	 * covering every page of that product's settings (its own tabs).
+	 *
+	 * @return array[] [ { key, label, path, capability, pages, parent, slug, position } ]
+	 * @since 1.1.23
+	 */
+	public function settings_tabs() {
+		if ( null !== $this->settings_tabs ) {
+			return $this->settings_tabs;
+		}
+
+		$tabs = array();
+
+		if ( ! self::enabled() ) {
+			return $tabs;
+		}
+
+		$essentials = self::find_item( self::ESSENTIALS_SETTINGS );
+
+		if ( $essentials && self::SLUG === $essentials['parent'] ) {
+			$tabs['cp-essentials'] = array(
+				'key'        => 'cp-essentials',
+				'label'      => __( 'Essentials', 'churchplugins' ),
+				'path'       => 'admin.php?page=' . self::ESSENTIALS_SETTINGS,
+				'capability' => isset( $essentials['item'][1] ) ? $essentials['item'][1] : 'manage_options',
+				'pages'      => array( self::ESSENTIALS_SETTINGS ),
+				'parent'     => self::SLUG,
+				'slug'       => self::ESSENTIALS_SETTINGS,
+				'position'   => 0,
+			);
+		}
+
+		$license_ids = Licenses::ids();
+
+		foreach ( self::products() as $key => $product ) {
+			if ( empty( $product['settings'] ) ) {
+				continue;
+			}
+
+			$found = self::find_item( $product['settings'] );
+
+			if ( ! $found ) {
+				continue;
+			}
+
+			$pages = array_values( array_diff( array_merge( array( $product['settings'] ), self::tab_group_pages( $product['settings'] ) ), $license_ids ) );
+
+			$tabs[ $key ] = array(
+				'key'        => (string) $key,
+				'label'      => self::settings_label( $product ),
+				'path'       => 'admin.php?page=' . $product['settings'],
+				'capability' => isset( $found['item'][1] ) ? (string) $found['item'][1] : 'manage_options',
+				'pages'      => array_values( array_unique( $pages ) ),
+				'parent'     => $found['parent'],
+				'slug'       => (string) $product['settings'],
+				'position'   => isset( $product['position'] ) ? (int) $product['position'] : MenuLayout::DEFAULT_SLOT,
+			);
+		}
+
+		/**
+		 * Filters the tabs of the Settings screen.
+		 *
+		 * A screen host (CP Essentials) can list these as its own tabs; each
+		 * tab's `path` is the product's existing settings page, which keeps
+		 * its URL, form handling and sub-tabs.
+		 *
+		 * @param array $tabs key => { label, path, capability, pages: string[], position }.
+		 * @since 1.1.23
+		 */
+		$tabs = apply_filters( 'cp_admin_settings_tabs', $tabs );
+		$tabs = is_array( $tabs ) ? $tabs : array();
+
+		uasort(
+			$tabs,
+			static function ( $a, $b ) {
+				$a = isset( $a['position'] ) ? (int) $a['position'] : MenuLayout::DEFAULT_SLOT;
+				$b = isset( $b['position'] ) ? (int) $b['position'] : MenuLayout::DEFAULT_SLOT;
+				return $a - $b;
+			}
+		);
+
+		// Cache once the menu has been built; while it is being built
+		// (relocate() runs at 998) pages can still be added or hidden.
+		if ( did_action( 'admin_menu' ) && ! doing_action( 'admin_menu' ) ) {
+			$this->settings_tabs = $tabs;
+		}
+
+		return $tabs;
+	}
+
+	/**
+	 * Label of a product's Settings tab.
+	 *
+	 * @param array $product Product entry.
+	 * @return string
+	 */
+	protected static function settings_label( array $product ) {
+		if ( ! empty( $product['label_type'] ) ) {
+			$object = get_post_type_object( $product['label_type'] );
+
+			if ( $object && ! empty( $object->labels->name ) ) {
+				return (string) $object->labels->name;
+			}
+		}
+
+		if ( ! empty( $product['settings_label'] ) ) {
+			return (string) $product['settings_label'];
+		}
+
+		return isset( $product['name'] ) ? (string) $product['name'] : '';
+	}
+
+	/**
+	 * Option keys of every CMB2 options page in a tab group (a product's
+	 * settings tabs).
+	 *
+	 * @param string $group Tab group (the product's main settings slug).
+	 * @return string[]
+	 */
+	protected static function tab_group_pages( $group ) {
+		if ( ! class_exists( '\CMB2_Boxes' ) ) {
+			return array();
+		}
+
+		$pages = array();
+
+		foreach ( \CMB2_Boxes::get_all() as $cmb ) {
+			if ( $group !== $cmb->prop( 'tab_group' ) ) {
+				continue;
+			}
+
+			$keys = $cmb->options_page_keys();
+
+			if ( ! empty( $keys[0] ) ) {
+				$pages[] = (string) $keys[0];
+			}
+		}
+
+		return $pages;
+	}
+
+	/**
+	 * The Settings entry's slug ('' when there is none).
+	 *
+	 * @return string
+	 * @since 1.1.23
+	 */
+	public function settings_entry() {
+		return $this->settings_entry;
+	}
+
+	/**
+	 * Areas moved this request.
+	 *
+	 * @return array<string, array>
+	 * @since 1.1.23
+	 */
+	public function areas() {
+		return $this->areas;
+	}
+
+	/**
+	 * URL of the first area a user can open, for links to "the new menu".
+	 *
+	 * @return string
+	 * @since 1.1.23
+	 */
+	public function first_url() {
+		global $submenu;
+
+		foreach ( (array) ( isset( $submenu[ self::SLUG ] ) ? $submenu[ self::SLUG ] : array() ) as $item ) {
+			if ( isset( $item[1], $item[2] ) && current_user_can( $item[1] ) ) {
+				return admin_url( MenuLayout::item_path( self::SLUG, $item[2] ) );
+			}
+		}
+
+		return admin_url();
+	}
+
+	/**
+	 * Tab groups: one per area, plus Settings.
+	 *
+	 * @return array<string, array> key => { label, menu, tabs }.
+	 * @since 1.1.23
+	 */
+	public function groups() {
+		global $submenu;
+
+		$groups  = array();
+		$exclude = Licenses::ids();
+		$tabs    = $this->settings_tabs();
+
+		foreach ( $tabs as $tab ) {
+			$exclude = array_merge( $exclude, isset( $tab['pages'] ) ? (array) $tab['pages'] : array() );
+		}
+
+		$owned = array();
+
+		foreach ( self::products() as $product_key => $product ) {
+			foreach ( isset( $product['taxonomies'] ) ? (array) $product['taxonomies'] : array() as $taxonomy ) {
+				$owned[ (string) $taxonomy ] = (string) $product_key;
+			}
+		}
+
+		foreach ( $this->areas as $key => $area ) {
+			$items = isset( $submenu[ $area['old'] ] ) ? (array) $submenu[ $area['old'] ] : array();
+			$area_tabs = MenuLayout::drop_foreign_taxonomies( MenuLayout::area_tabs( $items, $area['old'], $exclude ), $key, $owned );
+
+			/**
+			 * Filters the tabs of an area of the shared menu.
+			 *
+			 * @param array  $tabs Tabs: [ { label, path, capability } ].
+			 * @param string $key  Area key (product key, or `post_type:<name>`).
+			 * @param array  $area Area: { product, old, menu, label, capability, position }.
+			 * @since 1.1.23
+			 */
+			$area_tabs = apply_filters( 'cp_admin_area_tabs', $area_tabs, $key, $area );
+
+			$groups[ $key ] = array(
+				'label' => MenuLayout::strip_count( $area['label'] ),
+				'menu'  => $area['menu'],
+				'tabs'  => is_array( $area_tabs ) ? array_values( $area_tabs ) : array(),
+			);
+		}
+
+		if ( $tabs ) {
+			$groups['settings'] = array(
+				'label' => __( 'Settings', 'churchplugins' ),
+				'menu'  => $this->settings_entry,
+				'tabs'  => array_values( $tabs ),
+			);
+		}
+
+		return $groups;
+	}
+
+	/**
+	 * The current screen as a tab target.
+	 *
+	 * @return array|null
+	 */
+	protected static function current_target() {
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Reading which screen is open.
+		$page = isset( $_GET['page'] ) && is_string( $_GET['page'] ) ? sanitize_text_field( wp_unslash( $_GET['page'] ) ) : '';
+
+		if ( '' === $page && ! $screen ) {
+			return null;
+		}
+
+		return MenuLayout::screen_target(
+			$screen ? (string) $screen->base : '',
+			$screen ? (string) $screen->post_type : '',
+			$screen ? (string) $screen->taxonomy : '',
+			$page
+		);
+	}
+
+	/**
+	 * The group and tab of the current screen.
+	 *
+	 * @return array{group: string, tab: int}|null
+	 * @since 1.1.23
+	 */
+	public function current() {
+		if ( ! self::enabled() || ( ! $this->areas && ! $this->settings_tabs() ) ) {
+			return null;
+		}
+
+		$target = self::current_target();
+
+		return $target ? MenuLayout::current( $this->groups(), $target ) : null;
+	}
+
+	/**
+	 * Open the Church Plugins menu on every moved screen.
+	 *
+	 * @param string $parent_file Parent menu file.
+	 * @return string
+	 * @since 1.1.23
+	 */
+	public function parent_file( $parent_file ) {
+		$this->is_ours = false;
+
+		if ( $this->current() ) {
+			$this->is_ours = true;
+			return self::SLUG;
+		}
+
+		foreach ( $this->areas as $area ) {
+			if ( $parent_file === $area['old'] ) {
+				$this->is_ours = true;
+				return self::SLUG;
+			}
+		}
+
+		return $parent_file;
+	}
+
+	/**
+	 * Highlight the area's entry (or Settings) on every screen it covers.
+	 *
+	 * @param string|null $submenu_file Submenu file.
+	 * @param string      $parent_file  Parent file.
+	 * @return string|null
+	 * @since 1.1.23
+	 */
+	public function submenu_file( $submenu_file, $parent_file = '' ) {
+		global $plugin_page;
+
+		unset( $parent_file );
+
+		if ( ! $this->is_ours ) {
+			return $submenu_file;
+		}
+
+		$this->map_parents_for_render();
+
+		$current = $this->current();
+
+		if ( $current ) {
+			$groups = $this->groups();
+			return '' !== (string) $groups[ $current['group'] ]['menu'] ? $groups[ $current['group'] ]['menu'] : $submenu_file;
+		}
+
+		// A screen of an area that is not one of its tabs.
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+
+		foreach ( $this->areas as $area ) {
+			if ( $screen && ! $plugin_page && $screen->post_type && 'edit.php?post_type=' . $screen->post_type === $area['old'] ) {
+				return $area['menu'];
+			}
+		}
+
+		return $submenu_file;
+	}
+
+	/**
+	 * While the menu is printed, point the hidden parents at the shared menu.
+	 *
+	 * Right after the `submenu_file` filter, core's menu-header.php calls
+	 * get_admin_page_parent(), which resets `$parent_file` to the first
+	 * submenu that lists the screen: for a moved screen, its old (hidden)
+	 * parent, so the shared menu would not open. Mapping those parents in
+	 * `$_wp_real_parent_file` makes that call answer `church-plugins`.
+	 * The page's access check and hook suffix were resolved before this, and
+	 * the mapping is undone as soon as the menu is printed (`adminmenu`).
+	 *
+	 * @return void
+	 */
+	protected function map_parents_for_render() {
+		global $submenu, $_wp_real_parent_file;
+
+		if ( null !== $this->restore ) {
+			return;
+		}
+
+		$keys = array();
+
+		foreach ( $this->areas as $area ) {
+			$keys[] = $area['old'];
+		}
+
+		foreach ( $this->settings_tabs() as $tab ) {
+			foreach ( isset( $tab['pages'] ) ? (array) $tab['pages'] : array() as $page ) {
+				if ( isset( $submenu[ $page ] ) ) {
+					$keys[] = $page;
+				}
+			}
+		}
+
+		foreach ( array_keys( (array) $submenu ) as $key ) {
+			if ( 0 === strpos( (string) $key, MenuLayout::HOLDER_PREFIX ) ) {
+				$keys[] = (string) $key;
+			}
+		}
+
+		if ( ! is_array( $_wp_real_parent_file ) ) {
+			$_wp_real_parent_file = array(); // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
+		}
+
+		$this->restore = array();
+
+		foreach ( array_unique( $keys ) as $key ) {
+			$this->restore[ $key ]        = array_key_exists( $key, $_wp_real_parent_file ) ? $_wp_real_parent_file[ $key ] : null;
+			$_wp_real_parent_file[ $key ] = self::SLUG; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
+		}
+
+		add_action( 'adminmenu', array( $this, 'restore_parents' ), 0 );
+	}
+
+	/**
+	 * Undo {@see self::map_parents_for_render()}.
+	 *
+	 * @return void
+	 */
+	public function restore_parents() {
+		global $_wp_real_parent_file;
+
+		foreach ( (array) $this->restore as $key => $value ) {
+			if ( null === $value ) {
+				unset( $_wp_real_parent_file[ $key ] );
+			} else {
+				$_wp_real_parent_file[ $key ] = $value; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
+			}
+		}
+
+		$this->restore = null;
+	}
+
+	/**
+	 * Order the shared menu and drop the self-referential parent item.
+	 *
+	 * When the first submenu is added to a parent that has no page of its own,
+	 * core's add_submenu_page() inserts a first submenu item that links back to
+	 * the parent slug (an empty page). Removing it makes the top-level menu link
+	 * to the first entry.
+	 *
+	 * @return void
+	 * @since 1.1.16
+	 * @since 1.1.23 Also orders the entries.
+	 */
+	public function remove_parent_submenu() {
+		global $submenu;
+
+		if ( empty( $submenu[ self::SLUG ] ) ) {
+			return;
+		}
+
+		if ( ! self::enabled() ) {
+			foreach ( $submenu[ self::SLUG ] as $index => $item ) {
+				if ( isset( $item[2] ) && self::SLUG === $item[2] ) {
+					unset( $submenu[ self::SLUG ][ $index ] );
+				}
+			}
+
+			$submenu[ self::SLUG ] = array_values( $submenu[ self::SLUG ] ); // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
+			return;
+		}
+
+		$submenu[ self::SLUG ] = MenuLayout::sort_submenu( $submenu[ self::SLUG ], MenuLayout::slots( self::products(), $this->settings_entry ) ); // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
+	}
+
+	/**
+	 * Keep the shared order when CP Essentials reorders the menu (its tidy()
+	 * runs at admin_menu priority 1000 and puts its own entries first).
+	 *
+	 * @param array $order { first: string[], last: string[] }.
+	 * @return array
+	 * @since 1.1.23
+	 */
+	public function essentials_order( $order ) {
+		global $submenu;
+
+		if ( ! self::enabled() || empty( $submenu[ self::SLUG ] ) ) {
+			return $order;
+		}
+
+		$slots = MenuLayout::slots( self::products(), $this->settings_entry );
+
+		return MenuLayout::essentials_order( MenuLayout::sort_submenu( $submenu[ self::SLUG ], $slots ), $slots );
+	}
+
+	/**
+	 * Print the tab bar across the top of an area's (or Settings') screens.
+	 *
+	 * @return void
+	 * @since 1.1.23
+	 */
+	public function tabs() {
+		$current = $this->current();
+
+		if ( ! $current ) {
+			return;
+		}
+
+		echo $this->render_tabs( $current['group'], $current['tab'], self::is_block_editor() ? 'cp-admin-tabs--editor' : '' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in render_tabs().
+	}
+
+	/**
+	 * Whether the current screen is the block editor.
+	 *
+	 * @return bool
+	 */
+	protected static function is_block_editor() {
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+
+		return $screen && method_exists( $screen, 'is_block_editor' ) && $screen->is_block_editor();
+	}
+
+	/**
+	 * Whether the current user can open a tab.
+	 *
+	 * @param array $tab Tab.
+	 * @return bool
+	 */
+	public static function can_open( array $tab ) {
+		$target = MenuLayout::target( isset( $tab['path'] ) ? $tab['path'] : '' );
+
+		if ( '' === $target['page'] && '' !== $target['taxonomy'] ) {
+			$taxonomy = get_taxonomy( $target['taxonomy'] );
+
+			if ( ! $taxonomy || ! $taxonomy->show_ui || ! current_user_can( $taxonomy->cap->manage_terms ) ) {
+				return false;
+			}
+		} elseif ( '' === $target['page'] && '' !== $target['post_type'] ) {
+			$object = get_post_type_object( $target['post_type'] );
+
+			if ( ! $object || ! $object->show_ui || ! current_user_can( $object->cap->edit_posts ) ) {
+				return false;
+			}
+		}
+
+		return current_user_can( isset( $tab['capability'] ) && '' !== $tab['capability'] ? $tab['capability'] : 'manage_options' );
+	}
+
+	/**
+	 * The tab bar for a group, or '' when fewer than two tabs can be opened.
+	 *
+	 * Same markup as CP Essentials' tab bars: core's nav tabs, the current tab
+	 * marked with `aria-current="page"`.
+	 *
+	 * @param string $key         Group key.
+	 * @param int    $current     Index of the current tab.
+	 * @param string $extra_class Extra class.
+	 * @return string
+	 * @since 1.1.23
+	 */
+	public function render_tabs( $key, $current, $extra_class = '' ) {
+		$groups = $this->groups();
+
+		if ( ! isset( $groups[ $key ] ) ) {
+			return '';
+		}
+
+		$links = '';
+		$count = 0;
+
+		foreach ( $groups[ $key ]['tabs'] as $index => $tab ) {
+			if ( ! self::can_open( $tab ) ) {
+				continue;
+			}
+
+			++$count;
+			$active = (int) $index === (int) $current;
+
+			$links .= sprintf(
+				'<a href="%1$s" class="nav-tab%2$s"%3$s>%4$s</a>',
+				esc_url( admin_url( $tab['path'] ) ),
+				$active ? ' nav-tab-active' : '',
+				$active ? ' aria-current="page"' : '',
+				esc_html( $tab['label'] )
+			);
+		}
+
+		if ( $count < 2 ) {
+			return '';
+		}
+
+		return sprintf(
+			'<nav class="nav-tab-wrapper cp-admin-tabs%1$s" aria-label="%2$s">%3$s</nav>',
+			'' !== $extra_class ? ' ' . esc_attr( $extra_class ) : '',
+			/* translators: %s: section name, such as "Messages". */
+			esc_attr( sprintf( __( '%s sections', 'churchplugins' ), $groups[ $key ]['label'] ) ),
+			$links
+		);
+	}
+
+	/**
+	 * Body class for the block editor's tab bar offset.
+	 *
+	 * @param string $classes Classes.
+	 * @return string
+	 * @since 1.1.23
+	 */
+	public function body_class( $classes ) {
+		$current = self::is_block_editor() ? $this->current() : null;
+
+		if ( $current && '' !== $this->render_tabs( $current['group'], $current['tab'] ) ) {
+			$classes .= ' cp-has-editor-tabs';
+		}
+
+		return $classes;
+	}
+
+	/**
+	 * Tab bar styles. In the block editor the bar sits above the editor,
+	 * which is moved down by the bar's height (as CP Essentials does).
+	 *
+	 * @return void
+	 * @since 1.1.23
+	 */
+	public function styles() {
+		if ( ! $this->current() ) {
+			return;
+		}
+
+		$css = '.cp-admin-tabs{margin:12px 20px 0 2px}.cp-admin-tabs+.wrap{margin-top:8px}'
+			. '.cp-admin-tabs--editor{position:fixed;z-index:30;top:32px;left:160px;right:0;margin:0;padding:8px 16px 0;background:#f0f0f1;border-bottom:1px solid #c3c4c7;height:44px;box-sizing:border-box;overflow-x:auto;white-space:nowrap}'
+			. '.cp-admin-tabs--editor .nav-tab{margin-bottom:-1px;font-size:13px;padding:5px 10px}'
+			. '.cp-has-editor-tabs .interface-interface-skeleton{top:76px}'
+			. '.folded .cp-admin-tabs--editor{left:36px}'
+			. '.is-fullscreen-mode .cp-admin-tabs--editor{top:var(--wp-admin--admin-bar--height,0);left:0}.is-fullscreen-mode.cp-has-editor-tabs .interface-interface-skeleton{top:calc(var(--wp-admin--admin-bar--height,0px) + 44px)}'
+			. '@media (max-width:960px){.auto-fold .cp-admin-tabs--editor{left:36px}}'
+			. '@media (max-width:782px){.cp-admin-tabs--editor,.is-fullscreen-mode .cp-admin-tabs--editor{top:46px;left:0}.cp-has-editor-tabs .interface-interface-skeleton,.is-fullscreen-mode.cp-has-editor-tabs .interface-interface-skeleton{top:90px}}';
+
+		wp_add_inline_style( 'common', $css );
 	}
 
 	/**

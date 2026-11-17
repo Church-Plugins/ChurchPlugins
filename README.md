@@ -33,8 +33,62 @@ Practical consequences:
 3. Consuming plugins update their submodule gitlink to the **merged master SHA** — never
    to a feature branch that may be deleted.
 
+## Shared admin menu (1.1.23)
+
+Every product's screens live under one top-level **Church Plugins** menu
+(slug `church-plugins`), whether or not the product calls anything:
+
+    Home (CP Essentials) · Messages · Events (CP Essentials) · Groups · Staff ·
+    Locations · Resources · Notification Bars · Church Info (CP Essentials) ·
+    Sync · Settings · Licenses
+
+- **How.** Products register their post types and pages as before. On
+  `admin_menu` priority 998, `Admin\Menu` removes each product's top-level
+  menu (from the product table, `Menu::products()`, plus any other top-level
+  list of a post type registered through `Setup\PostTypes\PostType`) and adds
+  one entry for it here. The old `$submenu` arrays stay, so every screen keeps
+  its URL, hook suffix and capability check. The pure rules are in
+  `Admin\MenuLayout`.
+- **Tabs.** The items of a product's old submenu (minus "Add New" and the
+  pages that moved to Settings/Licenses) become a tab bar on the list,
+  add-new, edit (classic and block editor) and taxonomy screens, with the
+  current tab marked `aria-current="page"` and the area's entry highlighted.
+  Markup matches CP Essentials' tab bars. Filter: `cp_admin_area_tabs`.
+- **Settings.** One entry; a tab per product on top of each product's
+  existing settings pages (their own tabs stay below as sub-tabs). Pages
+  keep their URLs, forms and save redirects. CP Live's page leaves
+  WordPress's Settings menu (old `options-general.php?page=…` URLs forward to
+  `admin.php?page=…`). Registry: `cp_admin_settings_tabs`
+  (`key => { label, path, capability, pages[], position }`). When CP
+  Essentials registers `cp-essentials-settings` under the shared menu, that
+  page is the Settings entry and its first tab.
+- **Licenses.** `Admin\Licenses` lists every `Setup\Admin\License` (each
+  registers itself when constructed). A row shows the product's existing
+  CMB2 license box posted to the same `admin-post.php` handler, or, without a
+  box (CP Sync), a field using the existing license REST routes. Activation
+  logic is unchanged. Old License tabs are taken out of the products' tabs
+  and their URLs forward to Licenses with `sl_activation` / `message`. A hub
+  can host the rows: return its page slug from `cp_admin_licenses_page`,
+  register that page and call `Licenses::get_instance()->render_rows()`.
+- **Capability and position.** `edit_posts` and position 26 while the menu
+  holds content screens (as CP Essentials does), else `manage_options` and 80
+  (filters `cp_admin_menu_capability`, `cp_admin_menu_position`).
+- **Notice.** `Admin\MenuNotice` records once per site (option
+  `cp_admin_menu_layout`) whether the site was already in use (product
+  content, saved product settings or a license key). Only those sites show a
+  one-time notice, to users who could open the moved screens and were
+  registered before the move; dismissed per user per site
+  (`cp_admin_menu_notice_dismissed`).
+- **Opt-out.** `add_filter( 'cp_admin_shared_menu', '__return_false' )` keeps
+  the old layout. Meant for one release cycle.
+
 ## Changelog
 
+### 1.1.23
+* Shared admin menu: every product's screens move under **Church Plugins**, with tab bars, one Settings screen, one Licenses screen and a one-time notice. See "Shared admin menu (1.1.23)" above.
+* `Setup\Admin\License` registers itself with `Admin\Licenses` and gains `get_id()`, `get_plugin_file()` and `get_settings_url()`. Activation, deactivation, checks and updates are unchanged.
+* `Setup\PostTypes\PostType::registered_post_types()` lists post types registered through the class.
+* Integration suite (`phpunit-integration.xml.dist`) that boots a real site.
 ### 1.1.22
 * Legacy template path (block template handoff off) on block themes: whether the
   plugin's view replaces the template is now decided from the block template core
