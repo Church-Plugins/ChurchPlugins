@@ -223,6 +223,10 @@ abstract class Templates {
 	 * Whether the main query is for one of this plugin's post types or
 	 * taxonomies, before the `cp_template_is_query` filter.
 	 *
+	 * A plugin that registers its types only in some cases returns empty
+	 * lists otherwise. WP_Query reads an empty list as "any", so empty lists
+	 * are skipped here instead of passed on.
+	 *
 	 * @since 1.1.21
 	 *
 	 * @return bool
@@ -234,11 +238,11 @@ abstract class Templates {
 			return false;
 		}
 
-		$types = $this->get_post_types();
+		$types      = (array) $this->get_post_types();
+		$taxonomies = (array) $this->get_taxonomies();
 
-		return $wp_query->is_singular( $types )
-			|| $wp_query->is_post_type_archive( $types )
-			|| $wp_query->is_tax( $this->get_taxonomies() );
+		return ( $types && ( $wp_query->is_singular( $types ) || $wp_query->is_post_type_archive( $types ) ) )
+			|| ( $taxonomies && $wp_query->is_tax( $taxonomies ) );
 	}
 
 	/**
@@ -654,31 +658,27 @@ abstract class Templates {
 	 * so the block can carry its id and classes without printing a second
 	 * <main> inside the block template's own.
 	 *
+	 * A plugin whose templates print their own header and footer overrides
+	 * this method, leaves those out while it renders, and passes the output
+	 * to split_view_html().
+	 *
 	 * @since 1.1.21
 	 *
-	 * @return array {
-	 *     @type string $before     Output printed before <main> (the after-header hook).
-	 *     @type array  $attributes The <main> element's id and class.
-	 *     @type string $content    Output inside <main>.
-	 *     @type string $after      Output printed after </main> (the before-footer hook).
-	 * }
+	 * @return array See split_view_html().
 	 */
 	public function get_block_view_parts() {
-		$parts = [
-			'before'     => '',
-			'attributes' => [],
-			'content'    => '',
-			'after'      => '',
-		];
-
 		$file = $this->get_template_hierarchy( 'default-template' );
 
 		if ( ! $file ) {
 			ob_start();
 			$this->get_view();
-			$parts['content'] = ob_get_clean();
 
-			return $parts;
+			return [
+				'before'     => '',
+				'attributes' => [],
+				'content'    => ob_get_clean(),
+				'after'      => '',
+			];
 		}
 
 		$restore_header = remove_action( 'cp_do_header', __CLASS__ . '::do_header' );
@@ -698,11 +698,36 @@ abstract class Templates {
 			}
 		}
 
+		return self::split_view_html( $html );
+	}
+
+	/**
+	 * Split a rendered view around its <main> element.
+	 *
+	 * Markup without a <main> element is returned whole as the content.
+	 *
+	 * @since 1.1.21
+	 *
+	 * @param string $html Rendered view markup.
+	 * @return array {
+	 *     @type string $before     Output printed before <main>.
+	 *     @type array  $attributes The <main> element's id and class.
+	 *     @type string $content    Output inside <main>.
+	 *     @type string $after      Output printed after </main>.
+	 * }
+	 */
+	protected static function split_view_html( $html ) {
+		$html  = (string) $html;
+		$parts = [
+			'before'     => '',
+			'attributes' => [],
+			'content'    => $html,
+			'after'      => '',
+		];
+
 		$close = strripos( $html, '</main>' );
 
 		if ( false === $close || ! preg_match( '/<main\b[^>]*>/i', $html, $open, PREG_OFFSET_CAPTURE ) || $open[0][1] > $close ) {
-			$parts['content'] = $html;
-
 			return $parts;
 		}
 
