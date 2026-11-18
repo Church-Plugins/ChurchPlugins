@@ -285,15 +285,16 @@ abstract class Templates {
 			// The view block renders the default template's shell; keep its body classes.
 			self::$template = $this->get_template_hierarchy( 'default-template' );
 			add_filter( 'body_class', [ $this, 'theme_body_class' ] );
-			add_filter( 'body_class', [ $this, 'template_body_class' ] );
+			add_filter( 'body_class', [ $this, 'default_template_body_class' ] );
 
 			return $template;
 		}
 
 		// The theme or a Site Editor customization supplies a block template for this request; use it.
 		if ( $this->resolved_block_template_overrides( $template ) ) {
+			// self::$template stays unset so the [cp-template] shortcode is inert here.
 			add_filter( 'body_class', [ $this, 'theme_body_class' ] );
-			add_filter( 'body_class', [ $this, 'template_body_class' ] );
+			add_filter( 'body_class', [ $this, 'default_template_body_class' ] );
 
 			return $template;
 		}
@@ -355,15 +356,28 @@ abstract class Templates {
 	 *
 	 * Used only on the legacy path (the block template handoff is off). The
 	 * decision is made from the template core actually resolved, not from a
-	 * guessed slug: a block theme's generic archive, single or index template
-	 * never qualifies, and neither does a customization saved for another
-	 * theme. A qualifying template is kept whether or not it contains the view
-	 * block, since a customer may have replaced the view with core blocks.
+	 * guessed slug: a block theme's generic archive, single, search or index
+	 * template never qualifies, and neither does a customization saved for
+	 * another theme. A qualifying template is kept whether or not it contains
+	 * the view block, since a customer may have replaced the view with core
+	 * blocks. That also means a qualifying template without the
+	 * churchplugins/view block shows none of the plugin's output; the
+	 * `cp_template_block_template_overrides` filter is the way out.
 	 *
 	 * Qualifying slugs, for a request this plugin matches natively:
 	 * single-{post_type}, single-{post_type}-{post_name}, the custom template
 	 * assigned to the post, archive-{post_type}, taxonomy-{taxonomy} and
 	 * taxonomy-{taxonomy}-{term}.
+	 *
+	 * A request this plugin matches only because `cp_template_is_query` added
+	 * it (not one of its own post types or taxonomies) never qualifies, so the
+	 * plugin's view always replaces the resolved template there. Up to 1.1.21
+	 * such a request deferred when a customized archive-/single- template
+	 * with the guessed slug existed.
+	 *
+	 * WordPress 6.0 to 6.2 does not record which template it resolved
+	 * (`$_wp_current_template_id` arrived in 6.3). There the decision falls
+	 * back to the slug guess used up to 1.1.21.
 	 *
 	 * @since 1.1.22
 	 *
@@ -373,20 +387,67 @@ abstract class Templates {
 	protected function resolved_block_template_overrides( $template ) {
 		global $_wp_current_template_id;
 
-		if ( ! str_ends_with( $template, '/wp-includes/template-canvas.php' ) || empty( $_wp_current_template_id ) ) {
+		// Classic templates are never deferred to here; the filter does not run for them.
+		if ( ! str_ends_with( (string) $template, '/wp-includes/template-canvas.php' ) ) {
 			return false;
 		}
 
-		$block_template = get_block_template( $_wp_current_template_id );
+		$block_template = null;
 
-		if ( ! $block_template || ! in_array( $block_template->source, [ 'custom', 'theme' ], true ) ) {
+		if ( empty( $_wp_current_template_id ) ) {
+			$overrides = $this->guessed_block_template_exists();
+		} else {
+			$block_template = get_block_template( $_wp_current_template_id );
+			$overrides      = $block_template ? $this->block_template_is_for_request( $block_template ) : false;
+		}
+
+		/**
+		 * Filters whether, on the legacy path, the block template core resolved
+		 * is left in place instead of being replaced with the plugin's view.
+		 *
+		 * Runs only on block themes, for a request the plugin handles while the
+		 * block template handoff is off. Since 1.1.22 two cases defer that the
+		 * plugin's view used to replace: a block theme that ships its own
+		 * single-, archive- or taxonomy- template for one of the plugin's types,
+		 * and a post with a custom template assigned in the editor. If such a
+		 * template has no churchplugins/view block, the plugin's output is gone
+		 * from that page. Return false to have the plugin's view replace the
+		 * resolved template:
+		 *
+		 *     add_filter( 'cp_template_block_template_overrides', '__return_false' );
+		 *
+		 * @since 1.1.22
+		 *
+		 * @param bool                    $overrides      Whether the resolved template is kept.
+		 * @param \WP_Block_Template|null $block_template The resolved block template; null when
+		 *                                                it is unknown (WordPress before 6.3).
+		 * @param Templates               $templates      The plugin's Templates instance.
+		 * @param string                  $template       Path of the template core chose.
+		 */
+		return (bool) apply_filters( 'cp_template_block_template_overrides', $overrides, $block_template, $this, $template );
+	}
+
+	/**
+	 * Whether a resolved block template is specific to the current request.
+	 *
+	 * @since 1.1.22
+	 *
+	 * @param \WP_Block_Template $block_template Template core resolved.
+	 * @return bool
+	 */
+	protected function block_template_is_for_request( $block_template ) {
+		if ( ! in_array( $block_template->source, [ 'custom', 'theme' ], true ) ) {
 			return false;
 		}
 
-		$slug     = $block_template->slug;
+		$slug     = (string) $block_template->slug;
 		$wp_query = $this->get_global_query_object();
-		$object   = $wp_query->get_queried_object();
 
+		if ( ! $wp_query ) {
+			return false;
+		}
+
+		$object     = $wp_query->get_queried_object();
 		$types      = (array) $this->get_post_types();
 		$taxonomies = (array) $this->get_taxonomies();
 
@@ -417,6 +478,29 @@ abstract class Templates {
 	}
 
 	/**
+	 * The deferral check used up to 1.1.21, kept for WordPress 6.0 to 6.2,
+	 * where the resolved template is not known: guess the template's slug from
+	 * the request and look for a saved customization with that name.
+	 *
+	 * @since 1.1.22
+	 *
+	 * @return bool
+	 */
+	protected function guessed_block_template_exists() {
+		$name  = is_archive() ? 'archive-' : 'single-';
+		$name .= get_post_type() ? get_post_type() : 'post';
+
+		$template_posts = get_posts(
+			[
+				'post_type' => 'wp_template',
+				'name'      => $name,
+			]
+		);
+
+		return ! empty( $template_posts );
+	}
+
+	/**
 	 * Get the plugin's human-readable name, as shown to site admins in the
 	 * view block's dropdown and the Site Editor's template titles.
 	 *
@@ -426,6 +510,11 @@ abstract class Templates {
 	 * in its Templates subclass (returning a translated string), or anyone can
 	 * use the `cp_template_plugin_name` filter. Template titles are registered
 	 * on `init` (priority 99), so either must be in place before then.
+	 *
+	 * The filter is applied here, so an override that does not call
+	 * `parent::get_plugin_name()` bypasses `cp_template_plugin_name`. Such an
+	 * override should apply the filter itself if the name is to stay
+	 * filterable.
 	 *
 	 * @since 1.1.21
 	 * @since 1.1.22 Added the `cp_template_plugin_name` filter.
@@ -645,7 +734,7 @@ abstract class Templates {
 	 * @return string[] Title and description.
 	 */
 	protected function get_taxonomy_template_labels( $taxonomy ) {
-		$singular   = $taxonomy->labels->singular_name;
+		$singular   = (string) $taxonomy->labels->singular_name;
 		$post_types = array_values( array_intersect( (array) $taxonomy->object_type, (array) $this->get_post_types() ) );
 		$post_types = array_filter( array_map( 'get_post_type_object', $post_types ? $post_types : (array) $taxonomy->object_type ) );
 		$owner      = 1 === count( $post_types ) ? reset( $post_types ) : null;
@@ -663,11 +752,14 @@ abstract class Templates {
 			];
 		}
 
-		$title = false !== stripos( $singular, $owner->labels->singular_name )
+		$owner_name = isset( $owner->labels->singular_name ) ? (string) $owner->labels->singular_name : '';
+
+		// An empty needle is a warning before PHP 8 and matches everything from 8.0; with no name there is nothing to prepend.
+		$title = ( '' === $owner_name || false !== stripos( $singular, $owner_name ) )
 			/* translators: %s: Taxonomy singular name, e.g. "Group Type". */
 			? sprintf( __( '%s Archive', 'churchplugins' ), $singular )
 			/* translators: 1: Post type singular name, e.g. "Group", 2: Taxonomy singular name, e.g. "Type". */
-			: sprintf( __( '%1$s %2$s Archive', 'churchplugins' ), $owner->labels->singular_name, $singular );
+			: sprintf( __( '%1$s %2$s Archive', 'churchplugins' ), $owner_name, $singular );
 
 		return [
 			$title,
@@ -715,9 +807,18 @@ abstract class Templates {
 	 * `cp_template_is_query` adds or removes the request, and when the request
 	 * uses one of the legacy modes that need the PHP templates: a page template
 	 * chosen with `cp_default_template`, or a [cp-template] shortcode /
-	 * `cp_disable_template`. Decided once per request.
+	 * `cp_disable_template`.
+	 *
+	 * Also false for a search scoped to one of the plugin's post types
+	 * (/groups/?s=foo, /?s=foo&post_type=cp_group). Core resolves the theme's
+	 * search or index template for it, which has no view block, so the legacy
+	 * path renders the plugin's archive view as it always has.
+	 *
+	 * Decided once per request, from the main query. An answer asked for
+	 * before the main query has run (before the `wp` action) is not kept.
 	 *
 	 * @since 1.1.21
+	 * @since 1.1.22 False for search requests; not memoized before `wp`.
 	 *
 	 * @return bool
 	 */
@@ -726,13 +827,19 @@ abstract class Templates {
 			return $this->block_template_handoff;
 		}
 
+		$wp_query = $this->get_global_query_object();
+
 		$handoff = $this->matches_query()
+			&& ! $wp_query->is_search()
 			&& $this->is_cp_query()
 			&& $this->supports_block_templates()
 			&& ! apply_filters( 'cp_default_template', false, $this )
 			&& ! apply_filters( 'cp_disable_template', has_shortcode( get_the_content(), 'cp-template' ), $this->get_template_hierarchy( 'default-template' ), $this );
 
-		$this->block_template_handoff = $handoff;
+		// Before `wp` the main query is not parsed yet; a "no" then says nothing about the request.
+		if ( did_action( 'wp' ) ) {
+			$this->block_template_handoff = $handoff;
+		}
 
 		return $handoff;
 	}
@@ -927,11 +1034,45 @@ abstract class Templates {
 
 		if ( $template_filename == 'default-template.php' ) {
 			$classes[] = 'cp-page-template';
-		} else {
+		} elseif ( '' !== $template_filename ) {
+			// No template at all (the plugin ships no default-template.php): no class to name.
 			$classes[] = 'page-template-' . sanitize_title( $template_filename );
 		}
 
 		return array_unique( $classes );
+	}
+
+	/**
+	 * Body classes for a request whose view is the plugin's default template
+	 * while a block template core resolved stays in place (the block template
+	 * handoff, or the legacy path deferring to a theme / customized template).
+	 *
+	 * Plugins override template_body_class() and read self::$template
+	 * themselves (CP Sermons adds `cpl-page-template` that way). On the
+	 * deferral path self::$template is deliberately unset, so it is pointed at
+	 * the default template for the duration of the call and then restored. A
+	 * `page-template-` class with nothing after it, which such an override
+	 * prints when there is no template, is dropped.
+	 *
+	 * @since 1.1.22
+	 *
+	 * @param array $classes List of classes to filter.
+	 * @return array
+	 */
+	public function default_template_body_class( $classes ) {
+		$previous = self::$template;
+
+		if ( ! self::$template ) {
+			self::$template = $this->get_template_hierarchy( 'default-template' );
+		}
+
+		try {
+			$classes = (array) $this->template_body_class( $classes );
+		} finally {
+			self::$template = $previous;
+		}
+
+		return array_values( array_diff( $classes, [ 'page-template-' ] ) );
 	}
 
 	/**
