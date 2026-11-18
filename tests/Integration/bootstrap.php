@@ -2,6 +2,18 @@
 /**
  * Boot a real WordPress admin request for the integration suite.
  *
+ * ============================================================================
+ * WARNING: RUN THIS SUITE ONLY AGAINST A DISPOSABLE SITE.
+ *
+ * It loads the real site and its database. Two tests delete the products'
+ * posts, settings options and license options, and rely on a database
+ * transaction being rolled back to put them back. Those tests skip themselves
+ * with a persistent object cache or when the tables are not InnoDB, but a
+ * crash or a killed run between the delete and the rollback is still possible.
+ * Never point CP_FW_WP_LOAD at a production site or at a site whose content
+ * you could not restore.
+ * ============================================================================
+ *
  * Environment:
  *   CP_FW_WP_LOAD  Path to wp-load.php (required).
  *   CP_FW_WP_URL   Site to load, e.g. http://church.local/menu-test/ on a
@@ -33,6 +45,8 @@ if ( ! $cp_fw_wp_load || ! is_readable( $cp_fw_wp_load ) ) {
 	fwrite( STDERR, "Integration suite: set CP_FW_WP_LOAD to a readable wp-load.php.\n" );
 	exit( 1 );
 }
+
+fwrite( STDERR, "Integration suite: running against the real site at {$cp_fw_wp_load}. Disposable sites only: some tests delete product content and options inside a transaction.\n" );
 
 if ( $cp_fw_wp_url ) {
 	$cp_fw_parts               = parse_url( $cp_fw_wp_url ); // phpcs:ignore WordPress.WP.AlternativeFunctions.parse_url_parse_url -- WordPress is not loaded yet.

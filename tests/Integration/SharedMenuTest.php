@@ -20,6 +20,39 @@ use PHPUnit\Framework\TestCase;
 class SharedMenuTest extends TestCase {
 
 	/**
+	 * Skip a test that deletes or changes the site's data unless rolling the
+	 * transaction back really undoes it.
+	 *
+	 * It does not with a persistent object cache (deleted options and post
+	 * counts would stay deleted in the cache after the rollback), nor on
+	 * tables that are not InnoDB (MyISAM ignores transactions: the deletes
+	 * would be final).
+	 *
+	 * @return void
+	 */
+	protected function require_rollback() {
+		global $wpdb;
+
+		if ( wp_using_ext_object_cache() ) {
+			$this->markTestSkipped( 'Writes to the site: skipped with a persistent object cache, which a database rollback does not undo.' );
+		}
+
+		$tables = array( $wpdb->posts, $wpdb->options );
+
+		if ( is_multisite() ) {
+			$tables[] = $wpdb->sitemeta;
+		}
+
+		foreach ( $tables as $table ) {
+			$engine = $wpdb->get_var( $wpdb->prepare( 'SELECT ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s', $table ) );
+
+			if ( 0 !== strcasecmp( (string) $engine, 'InnoDB' ) ) {
+				$this->markTestSkipped( "Writes to the site: skipped because {$table} is not InnoDB (" . ( $engine ? $engine : 'unknown engine' ) . '), so a rollback would not undo them.' );
+			}
+		}
+	}
+
+	/**
 	 * Slugs of the shared menu's entries.
 	 *
 	 * @return string[]
@@ -262,11 +295,19 @@ class SharedMenuTest extends TestCase {
 	 * as a fresh one when it has no content, settings or license key. CP
 	 * Essentials is taken out of the picture here; see
 	 * test_notice_state_with_essentials_active().
+	 *
+	 * DESTRUCTIVE if the rollback fails: deletes the products' posts, settings
+	 * and license options. Disposable sites only; see require_rollback().
 	 */
 	public function test_notice_state_existing_and_fresh() {
 		global $wpdb;
 
+		$this->require_rollback();
+
 		add_filter( 'cp_admin_menu_essentials_active', '__return_false' );
+
+		// The state is decided from what the menu moved, so build it first.
+		cp_fw_build_admin_menu( 'menuadmin' );
 
 		$wpdb->query( 'START TRANSACTION' );
 
@@ -570,7 +611,11 @@ class SharedMenuTest extends TestCase {
 	public function test_notice_state_with_essentials_active() {
 		global $wpdb;
 
+		$this->require_rollback();
+
 		add_filter( 'cp_admin_menu_essentials_active', '__return_true' );
+
+		cp_fw_build_admin_menu( 'menuadmin' );
 
 		$wpdb->query( 'START TRANSACTION' );
 

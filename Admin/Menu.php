@@ -108,6 +108,15 @@ class Menu {
 	protected $areas = array();
 
 	/**
+	 * Every area the shared menu takes this request, whoever is looking:
+	 * {@see self::$areas} before it is narrowed to what the user can open.
+	 *
+	 * @since 1.1.23
+	 * @var array<string, array>
+	 */
+	protected $planned = array();
+
+	/**
 	 * Slug of the Settings entry ('' when there is none).
 	 *
 	 * @var string
@@ -477,7 +486,9 @@ class Menu {
 		// an entry the user cannot open would be a link to a 403. An area the
 		// user cannot open keeps its old top-level item, which core removes or
 		// re-parents as it always has.
-		$this->areas   = MenuLayout::accessible_areas( $this->plan(), 'current_user_can' );
+		$plan          = $this->plan();
+		$this->planned = $plan;
+		$this->areas   = MenuLayout::accessible_areas( $plan, 'current_user_can' );
 		$this->groups  = null;
 		$this->current = array();
 
@@ -495,9 +506,23 @@ class Menu {
 		// example WordPress's Settings menu); it is reached from Settings now.
 		$real = is_array( $_wp_real_parent_file ) ? $_wp_real_parent_file : array();
 
+		// Old top-level slugs of every planned area, moved or not.
+		$area_parents = array_column( $plan, 'old' );
+
 		foreach ( $tabs as $tab ) {
 			// CP Essentials' Settings screen is the Settings entry itself.
 			if ( empty( $tab['parent'] ) || empty( $tab['slug'] ) || self::ESSENTIALS_SETTINGS === $tab['slug'] ) {
+				continue;
+			}
+
+			// A settings page under a product's own menu is never hidden. Where
+			// the area moved, that menu is gone and its items are tabs. Where it
+			// did not (this user cannot open the area: `manage_options` without
+			// `edit_posts`), the top-level item is still there, and core decides
+			// access to the page from the item's place under it: moved to a
+			// hidden holder, core would fall back to the top-level item's
+			// capability and refuse a page this user could open up to 1.1.22.
+			if ( in_array( $tab['parent'], $area_parents, true ) ) {
 				continue;
 			}
 
@@ -552,10 +577,10 @@ class Menu {
 			return;
 		}
 
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Passed through to the same screen; add_query_arg() encodes it.
-		$query = wp_unslash( $_GET );
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Passed through to the same screen, keys and values encoded.
+		$query = array_filter( (array) wp_unslash( $_GET ), 'is_string' );
 
-		wp_safe_redirect( add_query_arg( array_map( 'rawurlencode', array_filter( $query, 'is_string' ) ), admin_url( 'admin.php' ) ) );
+		wp_safe_redirect( admin_url( 'admin.php' ) . '?' . http_build_query( $query, '', '&', PHP_QUERY_RFC3986 ) );
 		exit;
 	}
 
@@ -669,6 +694,45 @@ class Menu {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Slugs of the products' main settings pages that are registered this
+	 * request, whoever is looking: the page has a CMB2 options box, or is in
+	 * the menu. (Core leaves a page out of the menu for a user who lacks its
+	 * capability, so the menu alone would depend on the user.)
+	 *
+	 * @return string[]
+	 * @since 1.1.23
+	 */
+	public static function registered_settings_pages() {
+		$boxes = array();
+
+		if ( class_exists( '\CMB2_Boxes' ) ) {
+			foreach ( \CMB2_Boxes::get_all() as $cmb ) {
+				if ( ! in_array( 'options-page', (array) $cmb->prop( 'object_types' ), true ) ) {
+					continue;
+				}
+
+				$keys = $cmb->options_page_keys();
+
+				if ( ! empty( $keys[0] ) ) {
+					$boxes[] = (string) $keys[0];
+				}
+			}
+		}
+
+		$pages = array();
+
+		foreach ( self::products() as $product ) {
+			$slug = empty( $product['settings'] ) ? '' : (string) $product['settings'];
+
+			if ( '' !== $slug && ( in_array( $slug, $boxes, true ) || self::find_item( $slug ) ) ) {
+				$pages[] = $slug;
+			}
+		}
+
+		return $pages;
 	}
 
 	/**
@@ -831,6 +895,18 @@ class Menu {
 	 */
 	public function areas() {
 		return $this->areas;
+	}
+
+	/**
+	 * Every area the shared menu takes this request, including the ones the
+	 * current user cannot open (which stay where they were for that user).
+	 * The same for every user, unlike {@see self::areas()}.
+	 *
+	 * @return array<string, array>
+	 * @since 1.1.23
+	 */
+	public function planned_areas() {
+		return $this->planned;
 	}
 
 	/**

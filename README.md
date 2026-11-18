@@ -77,16 +77,26 @@ Every product's screens live under one top-level **Church Plugins** menu
   holds content screens (as CP Essentials does), else `manage_options` and 80
   (filters `cp_admin_menu_capability`, `cp_admin_menu_position`). An area or
   the Settings entry is added only for a user who can open it; with no entry
-  left for a user (a Subscriber), the menu is not shown. The parent is
+  left for a user (a Subscriber), the menu is not shown. An area a user
+  cannot open stays where it was for that user, with its settings page under
+  it, so a user with `manage_options` but not `edit_posts` opens product
+  settings as before. The parent is
   registered at `admin_menu` priority 8 (9 up to 1.1.22), so a product that
   adds its screens at priority 9 finds it.
 - **Notice.** `Admin\MenuNotice` records once per site (option
-  `cp_admin_menu_layout`) whether the site was already in use (product
-  content, saved product settings or a license key; never when CP Essentials
-  is active at that moment, since it fills the same post types under this
-  same menu). Only those sites show a
-  one-time notice, to users who could open the moved screens and were
-  registered before the move; dismissed per user per site
+  `cp_admin_menu_layout`), the first time the menu is built there, whether the
+  site was already in use: a product whose screens moved has content, saved
+  settings or a license key. A product that was under this menu all along (CP
+  Sync) does not count, so a site that starts with only CP Sync and a saved
+  key is a fresh one. Never an existing install when CP Essentials is active
+  at that moment (it fills the same post types under this same menu), nor, on
+  a network, for a subsite created after the shared menu first ran on the
+  network (network option `cp_admin_menu_layout_since`). Limit: on a single
+  site, a product activated for the first time on 1.1.23 whose activation
+  routine writes its settings option counts as saved settings. Only existing
+  installs show a one-time notice, to users who could open the moved screens
+  and were registered before the move; it names Settings and Licenses only
+  to users who can open them; dismissed per user per site
   (`cp_admin_menu_notice_dismissed`).
 - **Opt-out.** `add_filter( 'cp_admin_shared_menu', '__return_false' )` keeps
   the old layout. Meant for one release cycle.
@@ -97,7 +107,8 @@ Every product's screens live under one top-level **Church Plugins** menu
 * Shared admin menu: every product's screens move under **Church Plugins**, with tab bars, one Settings screen, one Licenses screen and a one-time notice. See "Shared admin menu (1.1.23)" above.
 * `Setup\Admin\License` registers itself with `Admin\Licenses` and gains `get_id()`, `get_plugin_file()` and `get_settings_url()`. Activation, deactivation, checks and updates are unchanged.
 * `Setup\PostTypes\PostType::registered_post_types()` lists post types registered through the class.
-* Integration suite (`phpunit-integration.xml.dist`) that boots a real site. `CP_FW_PRELOAD=1` loads the copy under test for the run without placing it inside a plugin on the site.
+* Integration suite (`phpunit-integration.xml.dist`) that boots a real site. `CP_FW_PRELOAD=1` loads the copy under test for the run without placing it inside a plugin on the site. **Run it only against a disposable site:** two tests delete product posts, settings and license options and rely on a transaction rollback to restore them (they skip with a persistent object cache or non-InnoDB tables).
+* Unit suite: `tests/Unit/SharedMenuSimulationTest.php` builds the menu with core's own menu code (copied from WordPress 7.1.4 into `tests/menu-sim/core/`, GPL) in a child process per scenario, without a site or a database, and checks entries, access, hook suffixes, redirects, the Licenses rows and the notice state for subscriber, editor, administrator and a `manage_options`-without-`edit_posts` role, across product sets, with and without CP Essentials in both hook orders.
 * Code that hides a product's menu with `remove_menu_page( 'edit.php?post_type=cpl_item' )` (or another product's old top-level slug) still works when it runs on `admin_menu` before priority 998: the product is then not moved either. Run later (priority 998 and up, `admin_init`, `admin_head`) it no longer hides anything, because that item is gone and the screens are entries of `church-plugins`. There, use `remove_submenu_page( 'church-plugins', 'edit.php?post_type=cpl_item' )`, or the `cp_admin_shared_menu` opt-out.
 
 ### 1.1.22

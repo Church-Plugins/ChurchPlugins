@@ -646,22 +646,73 @@ class MenuLayout {
 	}
 
 	/**
+	 * The products whose screens the shared menu moved, whoever is looking.
+	 *
+	 * A product moved when its top-level menu became an area, or when it has
+	 * a settings page (which moved under Settings). A product that only adds
+	 * its own entry to the shared menu (CP Sync) did not move: it was already
+	 * here. Post types the product table does not list, which became areas of
+	 * their own, are included under their area key (`post_type:<name>`).
+	 *
+	 * @param array    $products       Product table.
+	 * @param array    $areas          Every planned area ({@see Menu::planned_areas()}).
+	 * @param string[] $settings_pages Slugs of the settings pages that are registered.
+	 * @return array<string, array{post_types: string[], settings: string}>
+	 */
+	public static function moved_products( array $products, array $areas, array $settings_pages ) {
+		$moved = array();
+
+		foreach ( $areas as $key => $area ) {
+			$key = (string) $key;
+
+			if ( isset( $products[ $key ] ) && is_array( $products[ $key ] ) ) {
+				$post_types = self::product_post_types( $products[ $key ] );
+			} elseif ( isset( $area['old'] ) && 0 === strpos( (string) $area['old'], 'edit.php?post_type=' ) ) {
+				$post_types = array( substr( (string) $area['old'], strlen( 'edit.php?post_type=' ) ) );
+			} else {
+				continue;
+			}
+
+			$moved[ $key ] = array(
+				'post_types' => $post_types,
+				'settings'   => '',
+			);
+		}
+
+		foreach ( $products as $key => $product ) {
+			if ( empty( $product['settings'] ) || ! in_array( (string) $product['settings'], $settings_pages, true ) ) {
+				continue;
+			}
+
+			$key = (string) $key;
+
+			if ( ! isset( $moved[ $key ] ) ) {
+				$moved[ $key ] = array( 'post_types' => array() );
+			}
+
+			$moved[ $key ]['settings'] = (string) $product['settings'];
+		}
+
+		return $moved;
+	}
+
+	/**
 	 * Whether a site had Church Plugins in use before the shared menu arrived.
 	 *
-	 * Decided once, the first time the shared menu runs on a site. Any saved
-	 * product settings, any license key, or any content in a product's post
-	 * types means people have been using the old menus. A fresh install has
-	 * none of these when it first loads the admin.
-	 *
+	 * Decided once, the first time the shared menu is built on a site, from
+	 * the products whose screens moved ({@see self::moved_products()}): saved
+	 * settings, a license key, or content in their post types means people
+	 * have been using the old menus. A fresh install has none of these when
+	 * it first loads the admin.
 	 *
 	 * Not when CP Essentials is active at that moment. Essentials creates
 	 * content in the same post types (messages, groups, staff) under this same
 	 * menu, so a church that started on Essentials and then adds a paid
 	 * product has content but never saw the old menus.
 	 *
-	 * @param int  $content_count     Posts (any status but auto-draft) in product post types.
-	 * @param bool $has_license       Whether any product has a license key saved.
-	 * @param bool $saved_settings    Whether any product's main settings were saved.
+	 * @param int  $content_count     Posts (any status but auto-draft) in the moved products' post types.
+	 * @param bool $has_license       Whether a moved product has a license key saved.
+	 * @param bool $saved_settings    Whether a moved product's main settings were saved.
 	 * @param bool $essentials_active Whether CP Essentials is active.
 	 * @return bool
 	 */

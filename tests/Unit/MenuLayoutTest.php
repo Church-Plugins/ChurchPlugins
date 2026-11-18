@@ -320,6 +320,48 @@ class MenuLayoutTest extends TestCase {
 	}
 
 	/**
+	 * A product moved when its menu became an area or it has a registered
+	 * settings page; one that only adds its own entry (CP Sync) did not.
+	 */
+	public function test_moved_products() {
+		$products = $this->products();
+		$areas    = MenuLayout::plan_areas( $this->core_menu(), $products, array( 'tribe_events' ) );
+		$moved    = MenuLayout::moved_products( $products, $areas, array( 'cpl_main_options', 'cp_live_main_options', 'not_a_product_page' ) );
+
+		$this->assertSame(
+			array(
+				'cp-library'             => array(
+					'post_types' => array( 'cpl_item_type', 'cpl_item' ),
+					'settings'   => 'cpl_main_options',
+				),
+				// Area moved; its settings page is not registered.
+				'cp-groups'              => array(
+					'post_types' => array( 'cp_group' ),
+					'settings'   => '',
+				),
+				'cp-staff'               => array(
+					'post_types' => array( 'cp_staff' ),
+					'settings'   => '',
+				),
+				// A framework post type the table does not list.
+				'post_type:tribe_events' => array(
+					'post_types' => array( 'tribe_events' ),
+					'settings'   => '',
+				),
+				// No area, settings moved out of WordPress's Settings menu.
+				'cp-live'                => array(
+					'post_types' => array(),
+					'settings'   => 'cp_live_main_options',
+				),
+			),
+			$moved
+		);
+
+		$this->assertSame( array(), MenuLayout::moved_products( array( 'cp-sync' => $products['cp-sync'] ), array(), array( 'cps_settings' ) ) );
+		$this->assertSame( array(), MenuLayout::moved_products( $products, array(), array() ) );
+	}
+
+	/**
 	 * The notice goes to existing installs only, to people who could see the
 	 * old menus, registered before the move, until they dismiss it.
 	 */

@@ -230,6 +230,16 @@ class Licenses {
 	}
 
 	/**
+	 * Ids of the licenses whose License tab moved to the Licenses screen.
+	 *
+	 * @return string[]
+	 * @since 1.1.23
+	 */
+	public function moved_ids() {
+		return array_map( 'strval', array_keys( $this->boxes() ) );
+	}
+
+	/**
 	 * CMB2 boxes that are a License tab, by license id.
 	 *
 	 * @return \CMB2[]

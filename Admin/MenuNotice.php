@@ -13,11 +13,23 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Tells people who used the old menus that they moved under Church Plugins.
  *
- * The first time the shared menu runs on a site, the site is recorded as an
- * existing install (it already has product content, saved product settings
- * or a license key) or a fresh one. Only existing installs get the notice,
- * and only users who could open the old menus and were registered before
- * the move. Each user dismisses it once (per site).
+ * The first time the shared menu is built on a site, the site is recorded as
+ * an existing install or a fresh one. It is an existing install when a
+ * product whose screens moved already has content, saved settings or a
+ * license key. A product that was under this menu all along (CP Sync) does
+ * not count: a site that starts with only CP Sync and a saved key is fresh,
+ * and gets no notice when another product is added later.
+ *
+ * Only existing installs get the notice, and only users who could open the
+ * old menus and were registered before the move. Each user dismisses it once
+ * (per site).
+ *
+ * Limits. On a network, a subsite created after the shared menu first ran
+ * anywhere on the network is always fresh, whatever a product's
+ * first-activation routine writes there (CP Staff's migrator saves its
+ * settings option). On a single site that cannot be told apart: a product
+ * activated for the first time on 1.1.23 that writes its settings option
+ * before the next admin page loads is recorded as an existing install.
  *
  * @since 1.1.23
  */
@@ -28,6 +40,12 @@ class MenuNotice {
 	 * was already in use: { version, since, existing }.
 	 */
 	const OPTION = 'cp_admin_menu_layout';
+
+	/**
+	 * Network option (multisite): when the shared menu first ran on any site
+	 * of the network. A subsite created later never saw the old menus.
+	 */
+	const NETWORK_OPTION = 'cp_admin_menu_layout_since';
 
 	/**
 	 * User option set when a user dismisses the notice.
@@ -76,7 +94,9 @@ class MenuNotice {
 	 * @return void
 	 */
 	public function record_state() {
-		if ( ! Menu::enabled() || false !== get_option( self::OPTION, false ) ) {
+		// Only where the menu was built: `admin_init` also fires for AJAX and
+		// admin-post.php requests, which have no menu to tell what moved.
+		if ( ! Menu::enabled() || ! did_action( 'admin_menu' ) || false !== get_option( self::OPTION, false ) ) {
 			return;
 		}
 
@@ -86,14 +106,46 @@ class MenuNotice {
 			return;
 		}
 
+		$moved    = MenuLayout::moved_products( $products, Menu::get_instance()->planned_areas(), Menu::registered_settings_pages() );
+		$existing = MenuLayout::is_existing_install( $this->content_count( $moved ), $this->has_license_key( $moved ), $this->has_saved_settings( $moved ), self::essentials_active() );
+
+		// Asked on every site, in use or not: the first one sets the network's date.
+		$new_subsite = $this->is_new_subsite();
+
 		add_option(
 			self::OPTION,
 			array(
 				'version'  => defined( 'CHURCHPLUGINS_VERSION' ) ? CHURCHPLUGINS_VERSION : '',
 				'since'    => time(),
-				'existing' => MenuLayout::is_existing_install( $this->content_count( $products ), $this->has_license_key(), $this->has_saved_settings( $products ), self::essentials_active() ),
+				'existing' => $existing && ! $new_subsite,
 			)
 		);
+	}
+
+	/**
+	 * Whether this is a subsite created after the shared menu first ran on
+	 * the network. Records that moment the first time it is asked.
+	 *
+	 * @return bool
+	 * @since 1.1.23
+	 */
+	protected function is_new_subsite() {
+		if ( ! is_multisite() ) {
+			return false;
+		}
+
+		$arrived = (int) get_site_option( self::NETWORK_OPTION, 0 );
+
+		if ( ! $arrived ) {
+			add_site_option( self::NETWORK_OPTION, time() );
+
+			return false;
+		}
+
+		$site       = get_site();
+		$registered = $site && ! empty( $site->registered ) ? (int) strtotime( $site->registered . ' UTC' ) : 0;
+
+		return $registered > $arrived;
 	}
 
 	/**
@@ -142,16 +194,16 @@ class MenuNotice {
 	}
 
 	/**
-	 * Posts in the products' post types, any status but auto-draft.
+	 * Posts in the moved products' post types, any status but auto-draft.
 	 *
-	 * @param array $products Product table.
+	 * @param array $moved From {@see MenuLayout::moved_products()}.
 	 * @return int
 	 */
-	protected function content_count( array $products ) {
+	protected function content_count( array $moved ) {
 		$count = 0;
 
-		foreach ( $products as $product ) {
-			foreach ( MenuLayout::product_post_types( $product ) as $post_type ) {
+		foreach ( $moved as $product ) {
+			foreach ( $product['post_types'] as $post_type ) {
 				if ( ! post_type_exists( $post_type ) ) {
 					continue;
 				}
@@ -168,12 +220,23 @@ class MenuNotice {
 	}
 
 	/**
-	 * Whether any product has a license key saved.
+	 * Whether a license that moved has a key saved: one whose License tab
+	 * went to the Licenses screen, or one of a moved product. A license that
+	 * was reached from the shared menu all along (CP Sync's) does not count.
 	 *
+	 * @param array $moved From {@see MenuLayout::moved_products()}.
 	 * @return bool
 	 */
-	protected function has_license_key() {
-		foreach ( Licenses::all() as $license ) {
+	protected function has_license_key( array $moved ) {
+		$tabs = Licenses::get_instance()->moved_ids();
+
+		foreach ( Licenses::all() as $id => $license ) {
+			$file = method_exists( $license, 'get_plugin_file' ) ? (string) $license->get_plugin_file() : '';
+
+			if ( ! in_array( (string) $id, $tabs, true ) && ! ( '' !== $file && isset( $moved[ basename( dirname( $file ) ) ] ) ) ) {
+				continue;
+			}
+
 			if ( '' !== (string) $license->get( 'license' ) ) {
 				return true;
 			}
@@ -183,13 +246,13 @@ class MenuNotice {
 	}
 
 	/**
-	 * Whether any product's main settings were ever saved.
+	 * Whether a moved product's main settings were ever saved.
 	 *
-	 * @param array $products Product table.
+	 * @param array $moved From {@see MenuLayout::moved_products()}.
 	 * @return bool
 	 */
-	protected function has_saved_settings( array $products ) {
-		foreach ( $products as $product ) {
+	protected function has_saved_settings( array $moved ) {
+		foreach ( $moved as $product ) {
 			if ( ! empty( $product['settings'] ) && false !== get_option( $product['settings'], false ) ) {
 				return true;
 			}
@@ -281,19 +344,36 @@ class MenuNotice {
 
 		$what = $names ? wp_sprintf( '%l', $names ) : __( 'Your Church Plugins screens', 'churchplugins' );
 
+		// Settings and Licenses are named only to a user who can open them.
+		$settings = '' !== (string) Menu::get_instance()->settings_entry();
+		$licenses = Licenses::has_any() && current_user_can( 'manage_options' );
+		$message  = array(
+			sprintf(
+				/* translators: %s: list of screens, such as "Messages, Groups and Staff". */
+				__( '%s are now under Church Plugins in the admin menu. Related screens, like categories and speakers, are tabs across the top of each screen.', 'churchplugins' ),
+				$what
+			),
+		);
+
+		if ( $settings && $licenses ) {
+			$message[] = __( 'Settings for every product are under Church Plugins → Settings, and license keys under Church Plugins → Licenses.', 'churchplugins' );
+		} elseif ( $settings ) {
+			$message[] = __( 'Settings for every product are under Church Plugins → Settings.', 'churchplugins' );
+		} elseif ( $licenses ) {
+			$message[] = __( 'License keys are under Church Plugins → Licenses.', 'churchplugins' );
+		}
+
+		$message[] = $settings
+			? __( 'Your content, settings and saved links are unchanged.', 'churchplugins' )
+			: __( 'Your content and saved links are unchanged.', 'churchplugins' );
+
 		$dismiss_url = wp_nonce_url( add_query_arg( self::ACTION, '1' ), self::ACTION );
 
 		printf(
 			'<div class="notice notice-info is-dismissible cp-menu-moved-notice" data-nonce="%1$s"><p><strong>%2$s</strong></p><p>%3$s</p><p><a class="button button-primary" href="%4$s">%5$s</a> <a class="button-link" href="%6$s">%7$s</a></p></div>',
 			esc_attr( wp_create_nonce( self::ACTION ) ),
 			esc_html__( 'Church Plugins has moved to one menu', 'churchplugins' ),
-			esc_html(
-				sprintf(
-					/* translators: %s: list of screens, such as "Messages, Groups and Staff". */
-					__( '%s are now under Church Plugins in the admin menu. Related screens, like categories and speakers, are tabs across the top of each screen. Settings for every product are under Church Plugins → Settings, and license keys under Church Plugins → Licenses. Your content, settings and saved links are unchanged.', 'churchplugins' ),
-					$what
-				)
-			),
+			esc_html( implode( ' ', $message ) ),
 			esc_url( Menu::get_instance()->first_url() ),
 			esc_html__( 'Show me', 'churchplugins' ),
 			esc_url( $dismiss_url ),
