@@ -102,6 +102,26 @@ abstract class PostType {
 		}
 
 		register_post_type( $this->post_type, $cpt_args );
+
+		self::$registered_post_types[ $this->post_type ] = $this->post_type;
+	}
+
+	/**
+	 * Post types registered through this class, for the shared admin menu.
+	 *
+	 * @since 1.1.23
+	 * @var string[]
+	 */
+	protected static $registered_post_types = [];
+
+	/**
+	 * Post types registered through this class this request.
+	 *
+	 * @return string[]
+	 * @since 1.1.23
+	 */
+	public static function registered_post_types() {
+		return array_values( self::$registered_post_types );
 	}
 
 	// This is currently not being fired
