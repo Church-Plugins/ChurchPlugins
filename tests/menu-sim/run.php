@@ -38,7 +38,8 @@
  *   requests         { name: { pagenow, get, typenow?, screen?, tabs? } }
  *                    `screen.block_editor` makes get_current_screen() report
  *                    a block editor. `tabs` prints the tab bar, body class
- *                    and inline styles for that screen.
+ *                    and inline styles for that screen. `dispatch` runs the
+ *                    plugin page the way wp-admin/admin.php does.
  *   render           string[]  'notice', 'licenses'.
  *
  * @package ChurchPlugins
@@ -747,6 +748,30 @@ foreach ( array( '' => array( 'pagenow' => 'index.php', 'get' => array() ) ) + $
 		$result['body_class'] = $shared_menu->body_class( 'wp-admin' );
 		$shared_menu->styles();
 		$result['styles'] = $GLOBALS['sim_styles'];
+	}
+
+	// wp-admin/admin.php: a page with a callback runs it; a page with none
+	// is included as a plugin file, which dies with "Cannot load %s."
+	if ( ! empty( $request['dispatch'] ) && isset( $plugin_page ) && ! isset( $result['redirect'] ) ) {
+		if ( empty( $result['access'] ) ) {
+			$result['die'] = 'Sorry, you are not allowed to access this page.';
+		} elseif ( ! empty( $result['hook'] ) ) {
+			try {
+				do_action( 'load-' . $result['hook'] );
+				do_action( $result['hook'] );
+				$result['dispatched'] = true;
+			} catch ( SimDie $e ) {
+				$message = $e->getMessage();
+
+				if ( 0 === strpos( $message, 'REDIRECT ' ) ) {
+					$result['redirect'] = substr( $message, 9 );
+				} else {
+					$result['die'] = $message;
+				}
+			}
+		} else {
+			$result['die'] = 'Cannot load ' . htmlentities( $plugin_page ) . '.';
+		}
 	}
 
 	if ( '' !== $name ) {

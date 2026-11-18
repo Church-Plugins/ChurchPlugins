@@ -948,4 +948,60 @@ class SharedMenuSimulationTest extends TestCase {
 		$this->assertSame( 'wp-admin', $block['body_class'] );
 		$this->assertSame( array(), $block['styles'] );
 	}
+
+	/**
+	 * admin.php?page=church-plugins opens the first entry. An empty parent
+	 * callback used to die with "Cannot load church-plugins."
+	 */
+	public function test_parent_page_redirects_for_one_plugin_and_for_two() {
+		$cases = array(
+			'one plugin'  => array(
+				'products' => array( 'cp-groups' ),
+				'entries'  => array(
+					'edit.php?post_type=cp_group',
+					'admin.php?page=cp_groups_main_options',
+					'cp-licenses',
+				),
+			),
+			'two plugins' => array(
+				'products' => array( 'cp-library', 'cp-groups' ),
+				'entries'  => array(
+					'edit.php?post_type=cpl_item',
+					'edit.php?post_type=cp_group',
+					'admin.php?page=cpl_main_options',
+					'cp-licenses',
+				),
+			),
+		);
+
+		foreach ( $cases as $label => $case ) {
+			$result = self::simulate(
+				array(
+					'caps'     => self::ROLES['administrator'],
+					'products' => $case['products'],
+					'requests' => array(
+						'parent' => array(
+							'pagenow'  => 'admin.php',
+							'get'      => array( 'page' => 'church-plugins' ),
+							'dispatch' => true,
+						),
+					),
+				)
+			);
+
+			$this->assertSame( $case['entries'], array_column( $result['shared'], 'slug' ), $label );
+			$this->assertSame( $case['entries'][0], $result['top_link']['slug'], $label );
+
+			$asked = $result['requests']['parent'];
+
+			$this->assertTrue( $asked['access'], $label );
+			$this->assertSame( 'toplevel_page_church-plugins', $asked['hook'], $label );
+			$this->assertArrayNotHasKey( 'die', $asked, $label );
+			$this->assertSame(
+				'http://sim/wp-admin/' . $case['entries'][0],
+				$asked['redirect'],
+				$label
+			);
+		}
+	}
 }

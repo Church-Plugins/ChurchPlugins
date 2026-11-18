@@ -421,7 +421,7 @@ class Menu {
 			__( 'Church Plugins', 'churchplugins' ),
 			$capability,
 			self::SLUG,
-			'',
+			array( $this, 'redirect_parent' ),
 			$this->get_menu_icon(),
 			/**
 			 * Filters the position of the Church Plugins menu.
@@ -448,6 +448,21 @@ class Menu {
 		if ( ! self::parent_registered() ) {
 			$this->register_menu();
 		}
+	}
+
+	/**
+	 * Send a direct visit to the parent slug to the first entry.
+	 *
+	 * The parent has no screen of its own. An empty callback makes core try
+	 * to include a file named `church-plugins` and die with "Cannot load
+	 * church-plugins."
+	 *
+	 * @return void
+	 * @since 1.1.23
+	 */
+	public function redirect_parent() {
+		wp_safe_redirect( $this->first_url() );
+		exit;
 	}
 
 	/**
