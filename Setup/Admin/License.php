@@ -44,6 +44,41 @@ class License {
 		add_action( 'admin_init', array( $this, 'plugin_updater' ), 5 );
 		add_action( 'admin_notices', [ $this, 'admin_notices' ] );
 		add_action( 'rest_api_init', [ $this, 'register_rest_routes' ] );
+
+		// List this license on the shared Licenses screen (since 1.1.23).
+		if ( class_exists( '\ChurchPlugins\Admin\Licenses' ) ) {
+			\ChurchPlugins\Admin\Licenses::register( $this );
+		}
+	}
+
+	/**
+	 * The license id: its option name, e.g. `cpl_license`.
+	 *
+	 * @return string
+	 * @since 1.1.23
+	 */
+	public function get_id() {
+		return $this->id;
+	}
+
+	/**
+	 * Main file of the plugin this license belongs to.
+	 *
+	 * @return string
+	 * @since 1.1.23
+	 */
+	public function get_plugin_file() {
+		return $this->plugin_file;
+	}
+
+	/**
+	 * The URL the product registered as its license screen.
+	 *
+	 * @return string
+	 * @since 1.1.23
+	 */
+	public function get_settings_url() {
+		return $this->settings_url;
 	}
 
 	/**
@@ -606,7 +641,16 @@ class License {
 	 * This is a means of catching errors from the activation method above and displaying it to the customer
 	 */
 	function admin_notices() {
+		// Every product's License hooks this; the message is in the URL, so
+		// print it once (since 1.1.23).
+		static $printed = false;
+
+		if ( $printed ) {
+			return;
+		}
+
 		if ( isset( $_GET['sl_activation'] ) && ! empty( $_GET['message'] ) ) {
+			$printed = true;
 
 			switch ( $_GET['sl_activation'] ) {
 

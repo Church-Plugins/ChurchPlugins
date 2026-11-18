@@ -1,9 +1,9 @@
 <?php
 /**
- * WordPress-free bootstrap for request-action tests.
+ * WordPress-free bootstrap for the unit tests.
  *
  * Defines the handful of WordPress functions Admin\_Init calls, then loads that
- * class directly. The suite does not boot WordPress.
+ * class and the shared menu's layout rules (Admin\MenuLayout) directly. The suite does not boot WordPress.
  *
  * @package ChurchPlugins
  */
@@ -298,4 +298,10 @@ if ( ! function_exists( 'wp_send_json_error' ) ) {
 	}
 }
 
+if ( ! defined( 'ABSPATH' ) ) {
+	define( 'ABSPATH', __DIR__ . '/' );
+}
+
 require_once dirname( __DIR__ ) . '/Admin/_Init.php';
+require_once dirname( __DIR__ ) . '/Admin/MenuLayout.php';
+require_once dirname( __DIR__ ) . '/Admin/Menu.php';

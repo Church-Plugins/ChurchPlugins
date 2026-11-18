@@ -33,7 +33,132 @@ Practical consequences:
 3. Consuming plugins update their submodule gitlink to the **merged master SHA** — never
    to a feature branch that may be deleted.
 
+## Shared admin menu (1.1.23)
+
+Every product's screens live under one top-level **Church Plugins** menu
+(slug `church-plugins`), whether or not the product calls anything:
+
+    Home (CP Essentials) · Messages · Events (CP Essentials) · Groups · Staff ·
+    Locations · Resources · Notification Bars · Church Info (CP Essentials) ·
+    Sync · Settings · Licenses
+
+- **How.** Products register their post types and pages as before. On
+  `admin_menu` priority 998, `Admin\Menu` removes each product's top-level
+  menu (from the product table, `Menu::products()`, plus any other top-level
+  list of a post type registered through `Setup\PostTypes\PostType`) and adds
+  one entry for it here. The old `$submenu` arrays stay, so every screen keeps
+  its URL, hook suffix and capability check. The pure rules are in
+  `Admin\MenuLayout`.
+- **Tabs.** The items of a product's old submenu (minus "Add New" and the
+  pages that moved to Settings/Licenses) become a tab bar on the list,
+  add-new, edit (classic and block editor) and taxonomy screens, with the
+  current tab marked `aria-current="page"` and the area's entry highlighted.
+  Markup matches CP Essentials' tab bars. Filter: `cp_admin_area_tabs`.
+- **Settings.** One entry; a tab per product on top of each product's
+  existing settings pages (their own tabs stay below as sub-tabs). Pages
+  keep their URLs, forms and save redirects. CP Live's page leaves
+  WordPress's Settings menu (old `options-general.php?page=…` URLs forward to
+  `admin.php?page=…`). Registry: `cp_admin_settings_tabs`
+  (`key => { label, path, capability, pages[], position }`). When CP
+  Essentials registers `cp-essentials-settings` under the shared menu, that
+  page is the Settings entry and its first tab.
+- **Licenses.** `Admin\Licenses` lists every `Setup\Admin\License` (each
+  registers itself when constructed). A row shows the product's existing
+  CMB2 license box posted to the same `admin-post.php` handler, or, without a
+  box (CP Sync), a field using the existing license REST routes. Activation
+  logic is unchanged. Old License tabs are taken out of the products' tabs
+  and their URLs forward to Licenses with `sl_activation` / `message`. A hub
+  can host the rows: return its page slug from `cp_admin_licenses_page`,
+  register that page and call `Licenses::get_instance()->render_rows()`
+  (it prints nothing to a user without `manage_options`). Each row's field
+  ids are prefixed with its license id, so rows do not share ids; field names
+  are unchanged.
+- **Capability and position.** `edit_posts` and position 26 while the menu
+  holds content screens (as CP Essentials does), else `manage_options` and 80
+  (filters `cp_admin_menu_capability`, `cp_admin_menu_position`). An area or
+  the Settings entry is added only for a user who can open it; with no entry
+  left for a user (a Subscriber), the menu is not shown. An area a user
+  cannot open stays where it was for that user, with its settings page under
+  it, so a user with `manage_options` but not `edit_posts` opens product
+  settings as before. The parent is
+  registered at `admin_menu` priority 8 (9 up to 1.1.22), so a product that
+  adds its screens at priority 9 finds it.
+- **Notice.** `Admin\MenuNotice` records once per site (option
+  `cp_admin_menu_layout`), the first time the menu is built there, whether the
+  site was already in use: a product whose screens moved has content, saved
+  settings or a license key. A product that was under this menu all along (CP
+  Sync) does not count, so a site that starts with only CP Sync and a saved
+  key is a fresh one. Never an existing install when CP Essentials is active
+  at that moment (it fills the same post types under this same menu), nor, on
+  a network, for a subsite created after the shared menu first ran on the
+  network (network option `cp_admin_menu_layout_since`). Limit: on a single
+  site, a product activated for the first time on 1.1.23 whose activation
+  routine writes its settings option counts as saved settings. Only existing
+  installs show a one-time notice, to users who could open the moved screens
+  and were registered before the move; it names Settings and Licenses only
+  to users who can open them; dismissed per user per site
+  (`cp_admin_menu_notice_dismissed`).
+- **Opt-out.** `add_filter( 'cp_admin_shared_menu', '__return_false' )` keeps
+  the old layout. Meant for one release cycle.
+
 ## Changelog
+
+### 1.1.23
+* Shared admin menu: every product's screens move under **Church Plugins**, with tab bars, one Settings screen, one Licenses screen and a one-time notice. See "Shared admin menu (1.1.23)" above.
+* `Setup\Admin\License` registers itself with `Admin\Licenses` and gains `get_id()`, `get_plugin_file()` and `get_settings_url()`. Activation, deactivation, checks and updates are unchanged.
+* `Setup\PostTypes\PostType::registered_post_types()` lists post types registered through the class.
+* Integration suite (`phpunit-integration.xml.dist`) that boots a real site. `CP_FW_PRELOAD=1` loads the copy under test for the run without placing it inside a plugin on the site. **Run it only against a disposable site:** two tests delete product posts, settings and license options and rely on a transaction rollback to restore them (they skip with a persistent object cache or non-InnoDB tables).
+* Unit suite: `tests/Unit/SharedMenuSimulationTest.php` builds the menu with core's own menu code (copied from WordPress 7.1.4 into `tests/menu-sim/core/`, GPL) in a child process per scenario, without a site or a database, and checks entries, access, hook suffixes, redirects, the Licenses rows and the notice state for subscriber, editor, administrator and a `manage_options`-without-`edit_posts` role, across product sets, with and without CP Essentials in both hook orders.
+* Code that hides a product's menu with `remove_menu_page( 'edit.php?post_type=cpl_item' )` (or another product's old top-level slug) still works when it runs on `admin_menu` before priority 998: the product is then not moved either. Run later (priority 998 and up, `admin_init`, `admin_head`) it no longer hides anything, because that item is gone and the screens are entries of `church-plugins`. There, use `remove_submenu_page( 'church-plugins', 'edit.php?post_type=cpl_item' )`, or the `cp_admin_shared_menu` opt-out.
+
+### 1.1.22
+* Legacy template path (block template handoff off) on block themes: whether the
+  plugin's view replaces the template is now decided from the block template core
+  actually resolved (`Templates::resolved_block_template_overrides()`), not from a
+  guessed slug. Fixes a sermon taxonomy page falling back to the theme's generic archive
+  when `archive-cpl_item` was customized; customized `taxonomy-*` templates are now
+  honored; a customization saved under another theme no longer counts. The framework's
+  body classes (`cp-template`, `cp-page-template`, the theme class) are added when
+  deferring, with whatever a plugin's own `template_body_class()` override adds. CP
+  Sermons' `cpl-page-template` is **not** among them, on any path, now or before: its
+  `Templates` class redeclares `protected static $template`, so its override reads a
+  copy the framework never writes. It prints `cpl-template`; the bare `page-template-`
+  class it used to print as well is now dropped on every path
+  (`Templates::strip_empty_template_class()`).
+* **Behavior change, legacy path only.** Two cases now keep the resolved template where
+  1.1.21 replaced it with the plugin's view, matching what the handoff already does:
+  (1) a theme that ships its own `single-{post_type}`, `archive-{post_type}` or
+  `taxonomy-{taxonomy}` block template for a CP type, and (2) a post whose custom
+  template, assigned in the editor, contains the `churchplugins/view` block. In case
+  (1), if that template has no `churchplugins/view` block, the plugin's output no longer
+  appears on the page. Add the "Church Plugins Content" block to the template, or opt
+  out so the plugin's view replaces it again:
+  `add_filter( 'cp_template_block_template_overrides', '__return_false' );`
+  The filter runs whenever core resolved a block template for the request, which
+  includes classic themes with a `theme.json` (assigned custom templates). It receives
+  the decision, the resolved `WP_Block_Template` (null before WordPress 6.3, and on 6.3+
+  when the recorded template cannot be loaded), the `Templates` instance and the
+  template path, so it can be narrowed to one plugin or one template source.
+* An assigned custom template without the view block does not defer: the plugin's view
+  replaces it, as on 1.1.21, because the block can only be inserted in the Site Editor.
+  Only the template's own content is checked; a view block inside a template part or a
+  pattern the template references is not seen (place it in the template, or return true
+  from the filter).
+* A request a plugin handles only through `cp_template_is_query` (not one of its own
+  post types or taxonomies) no longer defers to a customized template on the legacy path.
+* WordPress 6.0 to 6.2 (no `$_wp_current_template_id`) keeps the 1.1.21 slug guess.
+* A search scoped to a CP post type (`/groups/?s=foo`, `/?s=foo&post_type=cp_group`)
+  is not handed to the block template hierarchy: core resolves the theme's search
+  template there, which has no view block, so the legacy path renders the archive view.
+* View block: offered only in the Site Editor (`cp_view_block_inserter`), titled
+  "Church Plugins Content", lists only the plugins that can show something on the
+  template being edited.
+* Template titles and descriptions say which page a template controls; taxonomy titles
+  name the post type. `Templates::get_plugin_name()` passes through the new
+  `cp_template_plugin_name` filter (an override that skips `parent::` bypasses it).
+* Tests: `tests/Unit/TemplatesTest.php` covers the deferral rules, the handoff decision,
+  what `template_include()` returns and hooks on each path, the body classes printed
+  (also for a subclass shaped like CP Sermons') and taxonomy template labels.
 
 ### 1.1.19
 * Request action hardening: `Admin\_Init::request_actions()` applies stricter checks
