@@ -887,4 +887,65 @@ class SharedMenuSimulationTest extends TestCase {
 		// A subscriber saw none of it.
 		$this->assertSame( '', self::simulate( $scenario + array( 'caps' => self::ROLES['subscriber'] ) )['notice'] );
 	}
+
+	/**
+	 * The tab bar is printed on a list screen and a classic editor, and not
+	 * on the block editor, where it covered the pre-publish panel.
+	 */
+	public function test_tab_bar_is_skipped_on_the_block_editor() {
+		$screen = array(
+			'post_type' => 'cpl_item',
+			'taxonomy'  => '',
+		);
+
+		$result = self::simulate(
+			array(
+				'caps'     => self::ROLES['administrator'],
+				'products' => array( 'cp-library' ),
+				'requests' => array(
+					'list'    => array(
+						'pagenow' => 'edit.php',
+						'get'     => array( 'post_type' => 'cpl_item' ),
+						'screen'  => array( 'base' => 'edit' ) + $screen,
+						'tabs'    => true,
+					),
+					'classic' => array(
+						'pagenow' => 'post.php',
+						'get'     => array( 'post_type' => 'cpl_item' ),
+						'screen'  => array(
+							'base'         => 'post',
+							'block_editor' => false,
+						) + $screen,
+						'tabs'    => true,
+					),
+					'block'   => array(
+						'pagenow' => 'post-new.php',
+						'get'     => array( 'post_type' => 'cpl_item' ),
+						'screen'  => array(
+							'base'         => 'post',
+							'block_editor' => true,
+						) + $screen,
+						'tabs'    => true,
+					),
+				),
+			)
+		);
+
+		foreach ( array( 'list', 'classic' ) as $name ) {
+			$asked = $result['requests'][ $name ];
+
+			$this->assertStringContainsString( 'class="nav-tab-wrapper cp-admin-tabs"', $asked['tabs'], $name );
+			$this->assertStringContainsString( 'Series', $asked['tabs'], $name );
+			$this->assertStringNotContainsString( 'cp-admin-tabs--editor', $asked['tabs'], $name );
+			$this->assertStringNotContainsString( 'cp-has-editor-tabs', $asked['body_class'], $name );
+			$this->assertSame( 'common', $asked['styles'][0][0], $name );
+			$this->assertStringContainsString( '.cp-admin-tabs{', $asked['styles'][0][1], $name );
+		}
+
+		$block = $result['requests']['block'];
+
+		$this->assertSame( '', $block['tabs'] );
+		$this->assertSame( 'wp-admin', $block['body_class'] );
+		$this->assertSame( array(), $block['styles'] );
+	}
 }

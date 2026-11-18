@@ -35,7 +35,10 @@
  *   settings_tabs    { key: tab }  tabs a host adds through `cp_admin_settings_tabs`.
  *   direct_entries   [ [ label, capability, slug ] ]  entries other code appends
  *                    to the shared menu's $submenu itself, with no capability check.
- *   requests         { name: { pagenow, get, typenow?, screen? } }
+ *   requests         { name: { pagenow, get, typenow?, screen?, tabs? } }
+ *                    `screen.block_editor` makes get_current_screen() report
+ *                    a block editor. `tabs` prints the tab bar, body class
+ *                    and inline styles for that screen.
  *   render           string[]  'notice', 'licenses'.
  *
  * @package ChurchPlugins
@@ -91,6 +94,29 @@ define( 'CHURCHPLUGINS_VERSION', 'sim' );
  * Thrown in place of core ending the request (wp_die(), a redirect's exit).
  */
 class SimDie extends Exception {}
+
+/**
+ * Stand-in for WP_Screen. `block_editor` in the scenario makes
+ * is_block_editor() true.
+ */
+class SimScreen {
+	public $base = '';
+	public $post_type = '';
+	public $taxonomy = '';
+	public $block_editor = false;
+
+	public function __construct( array $screen ) {
+		foreach ( $screen as $key => $value ) {
+			if ( property_exists( $this, $key ) ) {
+				$this->$key = $value;
+			}
+		}
+	}
+
+	public function is_block_editor() {
+		return (bool) $this->block_editor;
+	}
+}
 
 $GLOBALS['sim_caps']         = array_fill_keys( $sc['caps'], true );
 $GLOBALS['sim_options']      = $sc['options'];
@@ -155,7 +181,9 @@ function add_query_arg( ...$a ) {
 }
 function wp_nonce_url( $u, $a ) { return $u . ( false === strpos( $u, '?' ) ? '?' : '&' ) . '_wpnonce=nonce'; }
 function wp_create_nonce( $a ) { return 'nonce'; }
-function wp_add_inline_style() {}
+function wp_add_inline_style( $handle = '', $data = '' ) {
+	$GLOBALS['sim_styles'][] = array( (string) $handle, (string) $data );
+}
 function wp_add_inline_script() {}
 function wp_enqueue_script() {}
 function get_plugin_data() { return array(); }
@@ -686,7 +714,7 @@ foreach ( array( '' => array( 'pagenow' => 'index.php', 'get' => array() ) ) + $
 		$plugin_page = null;
 	}
 
-	$GLOBALS['sim_screen'] = isset( $request['screen'] ) ? (object) $request['screen'] : null;
+	$GLOBALS['sim_screen'] = isset( $request['screen'] ) ? new SimScreen( $request['screen'] ) : null;
 
 	$result = array( 'access' => user_can_access_admin_page() );
 
@@ -709,6 +737,16 @@ foreach ( array( '' => array( 'pagenow' => 'index.php', 'get' => array() ) ) + $
 		$submenu_file        = apply_filters( 'submenu_file', null, $parent_file );
 		$result['highlight'] = array( $parent_file, $submenu_file );
 		do_action( 'adminmenu' );
+	}
+
+	if ( ! empty( $request['tabs'] ) ) {
+		$GLOBALS['sim_styles'] = array();
+		ob_start();
+		$shared_menu->tabs();
+		$result['tabs']       = ob_get_clean();
+		$result['body_class'] = $shared_menu->body_class( 'wp-admin' );
+		$shared_menu->styles();
+		$result['styles'] = $GLOBALS['sim_styles'];
 	}
 
 	if ( '' !== $name ) {
