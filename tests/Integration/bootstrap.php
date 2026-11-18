@@ -8,12 +8,17 @@
  *                  multisite network (default: the main site).
  *   CP_FW_DB_SOCKET MySQL socket, when the CLI's php.ini lacks it (PHPUnit's
  *                  child processes do not inherit -d settings).
+ *   CP_FW_PRELOAD  Set to 1 to load this copy of the framework for the test
+ *                  processes only, without putting it inside a plugin on the
+ *                  site: its init.php is required on `muplugins_loaded`, and
+ *                  as the highest version it wins the usual arbitration.
  *
  * The site needs Church Plugins products active (CP Sermons, CP Groups and
  * CP Staff at least, CP Live for the WordPress Settings case), this copy of
- * the framework loaded (the highest version on the site), and users with the
- * logins `menuadmin` (administrator) and `menueditor` (editor). Tests that
- * write run in a transaction that is rolled back.
+ * the framework loaded (the highest version on the site; see CP_FW_PRELOAD),
+ * and users with the logins `menuadmin` (administrator) and `menueditor`
+ * (editor). Tests that write run in a transaction that is rolled back, and
+ * the run never spawns WP-Cron.
  *
  * Each test runs in its own process: core builds the admin menu once per
  * request.
@@ -46,8 +51,27 @@ if ( getenv( 'CP_FW_DB_SOCKET' ) ) {
 define( 'WP_ADMIN', true );
 define( 'WP_USE_THEMES', false );
 
+// A test run must not start the site's scheduled jobs.
+if ( ! defined( 'DISABLE_WP_CRON' ) ) {
+	define( 'DISABLE_WP_CRON', true );
+}
+
+if ( getenv( 'CP_FW_PRELOAD' ) ) {
+	// Hooks set before WordPress loads are adopted by wp-includes/plugin.php.
+	$GLOBALS['wp_filter']['muplugins_loaded'][0]['cp_fw_preload'] = array( // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Core's documented way to hook before it loads.
+		'function'      => static function () {
+			require_once dirname( __DIR__, 2 ) . '/init.php';
+		},
+		'accepted_args' => 0,
+	);
+}
+
 require_once $cp_fw_wp_load;
 require_once ABSPATH . 'wp-admin/includes/admin.php';
+
+if ( ! defined( 'CHURCHPLUGINS_DIR' ) || realpath( CHURCHPLUGINS_DIR ) !== realpath( dirname( __DIR__, 2 ) ) ) {
+	fwrite( STDERR, 'Integration suite: the site loaded the framework from ' . ( defined( 'CHURCHPLUGINS_DIR' ) ? CHURCHPLUGINS_DIR : '(nowhere)' ) . ", not from this copy; that is the copy under test. Set CP_FW_PRELOAD=1 to test this one.\n" );
+}
 
 /**
  * Build the admin menu the way wp-admin/admin.php does, as one user.

@@ -91,9 +91,31 @@ class MenuNotice {
 			array(
 				'version'  => defined( 'CHURCHPLUGINS_VERSION' ) ? CHURCHPLUGINS_VERSION : '',
 				'since'    => time(),
-				'existing' => MenuLayout::is_existing_install( $this->content_count( $products ), $this->has_license_key(), $this->has_saved_settings( $products ) ),
+				'existing' => MenuLayout::is_existing_install( $this->content_count( $products ), $this->has_license_key(), $this->has_saved_settings( $products ), self::essentials_active() ),
 			)
 		);
+	}
+
+	/**
+	 * Whether CP Essentials is active. It has no framework inside and shares
+	 * no code with it, so it is recognised by what its main file declares.
+	 *
+	 * @return bool
+	 * @since 1.1.23
+	 */
+	protected static function essentials_active() {
+		$active = defined( 'CP_ESSENTIALS_VERSION' ) || function_exists( 'cp_essentials' );
+
+		/**
+		 * Filters whether CP Essentials counts as active when the shared menu
+		 * first records whether a site was already in use. While it is, the
+		 * site is not treated as an existing install and gets no "menus moved"
+		 * notice.
+		 *
+		 * @param bool $active Whether CP Essentials is active.
+		 * @since 1.1.23
+		 */
+		return (bool) apply_filters( 'cp_admin_menu_essentials_active', $active );
 	}
 
 	/**

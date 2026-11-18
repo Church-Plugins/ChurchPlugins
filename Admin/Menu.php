@@ -136,6 +136,20 @@ class Menu {
 	protected $restore = null;
 
 	/**
+	 * Tab groups this request, cached once the menu is built.
+	 *
+	 * @var array|null
+	 */
+	protected $groups = null;
+
+	/**
+	 * Group and tab of a screen, by screen target, cached once the menu is built.
+	 *
+	 * @var array<string, array|null>
+	 */
+	protected $current = array();
+
+	/**
 	 * Get the single instance.
 	 *
 	 * @return Menu
@@ -149,11 +163,28 @@ class Menu {
 	}
 
 	/**
-	 * Constructor. Registers the parent menu early (priority 9) so products
-	 * adding submenus at the default priority (10) can attach to it.
+	 * Priority on `admin_menu` at which the parent menu is registered.
+	 *
+	 * Before 9: CP Essentials releases that add their screens at priority 9
+	 * hooked when their file loaded, so at an equal priority they would run
+	 * before this class (hooked on `plugins_loaded`) and find no parent; core
+	 * then registers a page as `admin_page_<slug>` and refuses to open it.
+	 *
+	 * @since 1.1.23
+	 * @var int
+	 */
+	const PARENT_PRIORITY = 8;
+
+	/**
+	 * Constructor. Registers the parent menu early (priority 8, 9 up to
+	 * 1.1.22) so products adding submenus at priority 9 or the default (10)
+	 * can attach to it.
 	 */
 	protected function __construct() {
-		add_action( 'admin_menu', array( $this, 'register_menu' ), 9 );
+		add_action( 'admin_menu', array( $this, 'register_menu' ), self::PARENT_PRIORITY );
+		// Where the parent was registered up to 1.1.22: covers a product that
+		// declares support after priority 8.
+		add_action( 'admin_menu', array( $this, 'register_menu_late' ), 9 );
 		add_action( 'admin_menu', array( $this, 'relocate' ), 998 );
 		// After all products have attached their submenus (default priority 10),
 		// drop the self-referential parent item and put entries in order.
@@ -397,6 +428,20 @@ class Menu {
 	}
 
 	/**
+	 * Register the parent at priority 9 when it was not registered at
+	 * {@see self::PARENT_PRIORITY}, for a product that declared support in
+	 * between. Never adds a second parent.
+	 *
+	 * @return void
+	 * @since 1.1.23
+	 */
+	public function register_menu_late() {
+		if ( ! self::parent_registered() ) {
+			$this->register_menu();
+		}
+	}
+
+	/**
 	 * Whether the parent menu was registered this request.
 	 *
 	 * @return bool
@@ -426,7 +471,15 @@ class Menu {
 			return;
 		}
 
-		$this->areas = $this->plan();
+		// Only the areas this user can open move. Entries are appended to
+		// $submenu directly, without the capability check add_submenu_page()
+		// does, and core links the top-level item to the first entry it finds:
+		// an entry the user cannot open would be a link to a 403. An area the
+		// user cannot open keeps its old top-level item, which core removes or
+		// re-parents as it always has.
+		$this->areas   = MenuLayout::accessible_areas( $this->plan(), 'current_user_can' );
+		$this->groups  = null;
+		$this->current = array();
 
 		list( $menu, $submenu ) = MenuLayout::apply_areas( (array) $menu, (array) $submenu, $this->areas ); // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Moving menus is the point.
 
@@ -553,7 +606,9 @@ class Menu {
 
 	/**
 	 * Add the Settings entry: CP Essentials' Settings screen when it has one,
-	 * else a link to the first product's settings.
+	 * else a link to the first product's settings the current user can open.
+	 * No entry when the user can open none of them (the entry is appended to
+	 * $submenu directly, so nothing else checks).
 	 *
 	 * @param array $tabs Settings tabs.
 	 * @return void
@@ -568,11 +623,20 @@ class Menu {
 			}
 		}
 
-		if ( ! $tabs ) {
+		$first = null;
+
+		foreach ( $tabs as $tab ) {
+			if ( ! empty( $tab['path'] ) && self::can_open( $tab ) ) {
+				$first = $tab;
+				break;
+			}
+		}
+
+		if ( ! $first ) {
 			return;
 		}
 
-		$first = reset( $tabs );
+		$first['capability'] = isset( $first['capability'] ) && '' !== $first['capability'] ? $first['capability'] : 'manage_options';
 
 		$this->settings_entry       = $first['path'];
 		$submenu[ self::SLUG ][]    = array( __( 'Settings', 'churchplugins' ), $first['capability'], $first['path'], __( 'Settings', 'churchplugins' ) ); // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
@@ -796,6 +860,10 @@ class Menu {
 	public function groups() {
 		global $submenu;
 
+		if ( null !== $this->groups ) {
+			return $this->groups;
+		}
+
 		$groups  = array();
 		$exclude = Licenses::ids();
 		$tabs    = $this->settings_tabs();
@@ -841,7 +909,22 @@ class Menu {
 			);
 		}
 
+		// Asked for several times per screen (menu highlight, tab bar, body
+		// class, styles). Kept once the menu is built, as settings_tabs() is.
+		if ( self::menu_built() ) {
+			$this->groups = $groups;
+		}
+
 		return $groups;
+	}
+
+	/**
+	 * Whether `admin_menu` has finished, so the menu no longer changes.
+	 *
+	 * @return bool
+	 */
+	protected static function menu_built() {
+		return did_action( 'admin_menu' ) && ! doing_action( 'admin_menu' );
 	}
 
 	/**
@@ -879,7 +962,24 @@ class Menu {
 
 		$target = self::current_target();
 
-		return $target ? MenuLayout::current( $this->groups(), $target ) : null;
+		if ( ! $target ) {
+			return null;
+		}
+
+		// By target: the screen can be set more than once in a request.
+		$key = md5( (string) wp_json_encode( $target ) );
+
+		if ( array_key_exists( $key, $this->current ) ) {
+			return $this->current[ $key ];
+		}
+
+		$current = MenuLayout::current( $this->groups(), $target );
+
+		if ( self::menu_built() ) {
+			$this->current[ $key ] = $current;
+		}
+
+		return $current;
 	}
 
 	/**
@@ -1034,6 +1134,10 @@ class Menu {
 		global $submenu;
 
 		if ( empty( $submenu[ self::SLUG ] ) ) {
+			if ( self::enabled() ) {
+				$this->remove_parent_without_entries();
+			}
+
 			return;
 		}
 
@@ -1049,6 +1153,36 @@ class Menu {
 		}
 
 		$submenu[ self::SLUG ] = MenuLayout::sort_submenu( $submenu[ self::SLUG ], MenuLayout::slots( self::products(), $this->settings_entry ) ); // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
+
+		$this->remove_parent_without_entries();
+	}
+
+	/**
+	 * Take the top-level item out when the current user can open none of its
+	 * entries. The parent has no page of its own, so on its own it would be a
+	 * link to nothing. Core does this only for a user who lacks the parent's
+	 * capability; a user can hold `edit_posts` and still have no entry here
+	 * (every area uses its own capabilities).
+	 *
+	 * @return void
+	 * @since 1.1.23
+	 */
+	protected function remove_parent_without_entries() {
+		global $menu, $submenu;
+
+		$items = isset( $submenu[ self::SLUG ] ) ? (array) $submenu[ self::SLUG ] : array();
+
+		if ( MenuLayout::has_accessible_item( $items, 'current_user_can' ) ) {
+			return;
+		}
+
+		unset( $submenu[ self::SLUG ] );
+
+		foreach ( (array) $menu as $index => $item ) {
+			if ( isset( $item[2] ) && self::SLUG === $item[2] ) {
+				unset( $menu[ $index ] );
+			}
+		}
 	}
 
 	/**
@@ -1084,7 +1218,34 @@ class Menu {
 			return;
 		}
 
-		echo $this->render_tabs( $current['group'], $current['tab'], self::is_block_editor() ? 'cp-admin-tabs--editor' : '' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in render_tabs().
+		$editor = self::is_block_editor();
+		$html   = $this->render_tabs( $current['group'], $current['tab'], $editor ? 'cp-admin-tabs--editor' : '' );
+
+		echo $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in render_tabs().
+
+		if ( $editor && '' !== $html ) {
+			if ( function_exists( 'wp_print_inline_script_tag' ) ) {
+				wp_print_inline_script_tag( self::editor_guard() );
+			} else {
+				echo '<script>' . self::editor_guard() . '</script>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Static script.
+			}
+		}
+	}
+
+	/**
+	 * Script that keeps the block editor's tab bar from ever covering the
+	 * editor (the safeguard CP Essentials uses for its bar). It waits for the
+	 * editor's frame (.interface-interface-skeleton); if the frame never
+	 * appears, or does not start below the bar (a layout this code does not
+	 * know, now or after a WordPress update), the bar is hidden and the
+	 * editor gets its full height back. Checked as the editor loads and
+	 * whenever the window or the frame resizes.
+	 *
+	 * @return string
+	 * @since 1.1.23
+	 */
+	public static function editor_guard() {
+		return '(function(){var b=document.querySelector(".cp-admin-tabs--editor");if(!b||!window.requestAnimationFrame){return;}var n=0;function off(){b.hidden=true;document.body.classList.remove("cp-has-editor-tabs");}function check(){var s=document.querySelector(".interface-interface-skeleton");if(!s){if(++n<120){window.requestAnimationFrame(check);}else if(b.offsetHeight){off();}return;}if(!b.offsetHeight){return;}if(s.getBoundingClientRect().top<b.getBoundingClientRect().bottom-1){off();}}window.addEventListener("load",check);window.addEventListener("resize",check);document.addEventListener("DOMContentLoaded",function(){check();if(window.ResizeObserver){var s=document.querySelector(".interface-interface-skeleton");if(s){new ResizeObserver(check).observe(s);}}});})();';
 	}
 
 	/**
@@ -1205,14 +1366,28 @@ class Menu {
 			return;
 		}
 
-		$css = '.cp-admin-tabs{margin:12px 20px 0 2px}.cp-admin-tabs+.wrap{margin-top:8px}'
-			. '.cp-admin-tabs--editor{position:fixed;z-index:30;top:32px;left:160px;right:0;margin:0;padding:8px 16px 0;background:#f0f0f1;border-bottom:1px solid #c3c4c7;height:44px;box-sizing:border-box;overflow-x:auto;white-space:nowrap}'
+		/*
+		 * The editor's bar is fixed above the editor frame, which is moved
+		 * down by the bar's height. The bar shows, and the frame moves, only
+		 * when that frame (.interface-interface-skeleton) is on the page, so a
+		 * renamed or missing frame hides the bar instead of letting it cover
+		 * the editor; browsers without :has() never show it. editor_guard()
+		 * also hides it if the frame does not start below it. Offsets from
+		 * the admin menu use logical properties, so the bar clears the menu
+		 * on the right in right-to-left languages.
+		 */
+		$bar   = 'body.cp-has-editor-tabs:has(.interface-interface-skeleton) .cp-admin-tabs--editor:not([hidden])';
+		$frame = 'body.cp-has-editor-tabs:has(.cp-admin-tabs--editor:not([hidden])) .interface-interface-skeleton';
+
+		$css = '.cp-admin-tabs{margin:12px 0 0;margin-inline:2px 20px}.cp-admin-tabs+.wrap{margin-top:8px}'
+			. '.cp-admin-tabs--editor{display:none;position:fixed;z-index:30;top:32px;inset-inline:160px 0;margin:0;padding:8px 16px 0;background:#f0f0f1;border-bottom:1px solid #c3c4c7;height:44px;box-sizing:border-box;overflow-x:auto;white-space:nowrap}'
+			. $bar . '{display:block}'
 			. '.cp-admin-tabs--editor .nav-tab{margin-bottom:-1px;font-size:13px;padding:5px 10px}'
-			. '.cp-has-editor-tabs .interface-interface-skeleton{top:76px}'
-			. '.folded .cp-admin-tabs--editor{left:36px}'
-			. '.is-fullscreen-mode .cp-admin-tabs--editor{top:var(--wp-admin--admin-bar--height,0);left:0}.is-fullscreen-mode.cp-has-editor-tabs .interface-interface-skeleton{top:calc(var(--wp-admin--admin-bar--height,0px) + 44px)}'
-			. '@media (max-width:960px){.auto-fold .cp-admin-tabs--editor{left:36px}}'
-			. '@media (max-width:782px){.cp-admin-tabs--editor,.is-fullscreen-mode .cp-admin-tabs--editor{top:46px;left:0}.cp-has-editor-tabs .interface-interface-skeleton,.is-fullscreen-mode.cp-has-editor-tabs .interface-interface-skeleton{top:90px}}';
+			. $frame . '{top:76px}'
+			. '.folded .cp-admin-tabs--editor{inset-inline-start:36px}'
+			. '.is-fullscreen-mode .cp-admin-tabs--editor{top:var(--wp-admin--admin-bar--height,0);inset-inline-start:0}.is-fullscreen-mode' . substr( $frame, 4 ) . '{top:calc(var(--wp-admin--admin-bar--height,0px) + 44px)}'
+			. '@media (max-width:960px){.auto-fold .cp-admin-tabs--editor{inset-inline-start:36px}}'
+			. '@media (max-width:782px){.cp-admin-tabs--editor,.auto-fold .cp-admin-tabs--editor,.folded .cp-admin-tabs--editor,.is-fullscreen-mode .cp-admin-tabs--editor{top:46px;inset-inline-start:0}' . $frame . ',.is-fullscreen-mode' . substr( $frame, 4 ) . '{top:90px}}';
 
 		wp_add_inline_style( 'common', $css );
 	}

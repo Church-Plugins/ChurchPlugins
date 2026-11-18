@@ -246,7 +246,93 @@ class MenuLayout {
 	}
 
 	/**
+	 * The areas a user can open.
+	 *
+	 * apply_areas() appends an entry per area straight to $submenu, where
+	 * nothing checks capabilities the way core's add_submenu_page() does, and
+	 * core links the top-level item to the first entry. So only areas the
+	 * user can open are moved.
+	 *
+	 * @param array    $areas From {@see self::plan_areas()}.
+	 * @param callable $can   Capability check: fn( string $capability ): bool.
+	 * @return array
+	 */
+	public static function accessible_areas( array $areas, $can ) {
+		$open = array();
+
+		foreach ( $areas as $key => $area ) {
+			if ( ! empty( $area['capability'] ) && call_user_func( $can, $area['capability'] ) ) {
+				$open[ $key ] = $area;
+			}
+		}
+
+		return $open;
+	}
+
+	/**
+	 * Whether a submenu has an item the user can open (the parent's link to
+	 * itself does not count).
+	 *
+	 * @param array    $items  Submenu items.
+	 * @param callable $can    Capability check: fn( string $capability ): bool.
+	 * @param string   $parent Shared parent slug.
+	 * @return bool
+	 */
+	public static function has_accessible_item( array $items, $can, $parent = Menu::SLUG ) {
+		foreach ( $items as $item ) {
+			if ( ! isset( $item[1], $item[2] ) || (string) $parent === (string) $item[2] ) {
+				continue;
+			}
+
+			if ( call_user_func( $can, $item[1] ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Make the ids of a form's fields unique on a screen that prints several
+	 * forms with the same field ids (one license box per product: each has
+	 * `id="license"` and `id="beta"`). Prefixes the `id` of each field and
+	 * the `for` of its labels; `name` attributes, and so what the form posts,
+	 * are untouched.
+	 *
+	 * @param string   $html      Form markup.
+	 * @param string[] $field_ids Field ids to prefix.
+	 * @param string   $prefix    Prefix, unique per form.
+	 * @return string
+	 */
+	public static function prefix_field_ids( $html, array $field_ids, $prefix ) {
+		$html = (string) $html;
+
+		foreach ( $field_ids as $field_id ) {
+			$field_id = (string) $field_id;
+
+			if ( '' === $field_id ) {
+				continue;
+			}
+
+			$replaced = preg_replace_callback(
+				'/(\s(?:id|for)=)(["\'])' . preg_quote( $field_id, '/' ) . '\2/',
+				static function ( $match ) use ( $prefix, $field_id ) {
+					return $match[1] . $match[2] . $prefix . '-' . $field_id . $match[2];
+				},
+				$html
+			);
+
+			$html = null === $replaced ? $html : $replaced;
+		}
+
+		return $html;
+	}
+
+	/**
 	 * Move areas under the shared parent.
+	 *
+	 * Pass only areas the user can open ({@see self::accessible_areas()}):
+	 * the entries are added without a capability check.
 	 *
 	 * The old top-level item is removed from $menu. Its submenu array stays
 	 * where it is: core finds a page's parent, hook suffix and capability
@@ -567,12 +653,23 @@ class MenuLayout {
 	 * types means people have been using the old menus. A fresh install has
 	 * none of these when it first loads the admin.
 	 *
-	 * @param int  $content_count  Posts (any status but auto-draft) in product post types.
-	 * @param bool $has_license    Whether any product has a license key saved.
-	 * @param bool $saved_settings Whether any product's main settings were saved.
+	 *
+	 * Not when CP Essentials is active at that moment. Essentials creates
+	 * content in the same post types (messages, groups, staff) under this same
+	 * menu, so a church that started on Essentials and then adds a paid
+	 * product has content but never saw the old menus.
+	 *
+	 * @param int  $content_count     Posts (any status but auto-draft) in product post types.
+	 * @param bool $has_license       Whether any product has a license key saved.
+	 * @param bool $saved_settings    Whether any product's main settings were saved.
+	 * @param bool $essentials_active Whether CP Essentials is active.
 	 * @return bool
 	 */
-	public static function is_existing_install( $content_count, $has_license, $saved_settings ) {
+	public static function is_existing_install( $content_count, $has_license, $saved_settings, $essentials_active = false ) {
+		if ( $essentials_active ) {
+			return false;
+		}
+
 		return (int) $content_count > 0 || (bool) $has_license || (bool) $saved_settings;
 	}
 

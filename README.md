@@ -69,13 +69,22 @@ Every product's screens live under one top-level **Church Plugins** menu
   logic is unchanged. Old License tabs are taken out of the products' tabs
   and their URLs forward to Licenses with `sl_activation` / `message`. A hub
   can host the rows: return its page slug from `cp_admin_licenses_page`,
-  register that page and call `Licenses::get_instance()->render_rows()`.
+  register that page and call `Licenses::get_instance()->render_rows()`
+  (it prints nothing to a user without `manage_options`). Each row's field
+  ids are prefixed with its license id, so rows do not share ids; field names
+  are unchanged.
 - **Capability and position.** `edit_posts` and position 26 while the menu
   holds content screens (as CP Essentials does), else `manage_options` and 80
-  (filters `cp_admin_menu_capability`, `cp_admin_menu_position`).
+  (filters `cp_admin_menu_capability`, `cp_admin_menu_position`). An area or
+  the Settings entry is added only for a user who can open it; with no entry
+  left for a user (a Subscriber), the menu is not shown. The parent is
+  registered at `admin_menu` priority 8 (9 up to 1.1.22), so a product that
+  adds its screens at priority 9 finds it.
 - **Notice.** `Admin\MenuNotice` records once per site (option
   `cp_admin_menu_layout`) whether the site was already in use (product
-  content, saved product settings or a license key). Only those sites show a
+  content, saved product settings or a license key; never when CP Essentials
+  is active at that moment, since it fills the same post types under this
+  same menu). Only those sites show a
   one-time notice, to users who could open the moved screens and were
   registered before the move; dismissed per user per site
   (`cp_admin_menu_notice_dismissed`).
@@ -88,7 +97,9 @@ Every product's screens live under one top-level **Church Plugins** menu
 * Shared admin menu: every product's screens move under **Church Plugins**, with tab bars, one Settings screen, one Licenses screen and a one-time notice. See "Shared admin menu (1.1.23)" above.
 * `Setup\Admin\License` registers itself with `Admin\Licenses` and gains `get_id()`, `get_plugin_file()` and `get_settings_url()`. Activation, deactivation, checks and updates are unchanged.
 * `Setup\PostTypes\PostType::registered_post_types()` lists post types registered through the class.
-* Integration suite (`phpunit-integration.xml.dist`) that boots a real site.
+* Integration suite (`phpunit-integration.xml.dist`) that boots a real site. `CP_FW_PRELOAD=1` loads the copy under test for the run without placing it inside a plugin on the site.
+* Code that hides a product's menu with `remove_menu_page( 'edit.php?post_type=cpl_item' )` (or another product's old top-level slug) still works when it runs on `admin_menu` before priority 998: the product is then not moved either. Run later (priority 998 and up, `admin_init`, `admin_head`) it no longer hides anything, because that item is gone and the screens are entries of `church-plugins`. There, use `remove_submenu_page( 'church-plugins', 'edit.php?post_type=cpl_item' )`, or the `cp_admin_shared_menu` opt-out.
+
 ### 1.1.22
 * Legacy template path (block template handoff off) on block themes: whether the
   plugin's view replaces the template is now decided from the block template core

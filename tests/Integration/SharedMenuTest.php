@@ -246,15 +246,27 @@ class SharedMenuTest extends TestCase {
 
 		$this->assertContains( 'edit.php?post_type=cp_group', self::top_level() );
 		$this->assertContains( 'cp_live_main_options', array_column( $GLOBALS['submenu']['options-general.php'], 2 ) );
-		$this->assertNull( self::parent_item(), 'No product declared support, so no shared menu.' );
+		$this->assertNotContains( 'edit.php?post_type=cp_group', self::entries() );
+		$this->assertNotContains( Menu::LICENSES_SLUG, self::entries() );
+
+		if ( function_exists( 'cp_essentials' ) ) {
+			// CP Essentials declares support, so the menu holds its screens only.
+			$this->assertSame( 1, count( array_keys( self::top_level(), Menu::SLUG, true ) ) );
+		} else {
+			$this->assertNull( self::parent_item(), 'No product declared support, so no shared menu.' );
+		}
 	}
 
 	/**
 	 * The site is recorded as an existing install when it has content, and
-	 * as a fresh one when it has no content, settings or license key.
+	 * as a fresh one when it has no content, settings or license key. CP
+	 * Essentials is taken out of the picture here; see
+	 * test_notice_state_with_essentials_active().
 	 */
 	public function test_notice_state_existing_and_fresh() {
 		global $wpdb;
+
+		add_filter( 'cp_admin_menu_essentials_active', '__return_false' );
 
 		$wpdb->query( 'START TRANSACTION' );
 
@@ -325,10 +337,58 @@ class SharedMenuTest extends TestCase {
 	}
 
 	/**
+	 * Add pages to the shared menu the way CP Essentials releases that used
+	 * priority 9 did: support declared at priority 1, and the pages added by
+	 * a callback that runs before anything the framework has at priority 9
+	 * (Essentials hooks when its file loads, the framework on
+	 * `plugins_loaded`).
+	 *
+	 * @param string[] $pages Page slugs.
+	 * @return void
+	 */
+	protected static function hook_early_pages( array $pages ) {
+		global $wp_filter;
+
+		add_action( 'admin_menu', array( Menu::class, 'add_support' ), 1 );
+
+		// Everything already hooked at priority 9 goes behind the new callback.
+		$hooked = isset( $wp_filter['admin_menu']->callbacks[9] ) ? $wp_filter['admin_menu']->callbacks[9] : array();
+
+		foreach ( $hooked as $callback ) {
+			remove_action( 'admin_menu', $callback['function'], 9 );
+		}
+
+		add_action(
+			'admin_menu',
+			static function () use ( $pages ) {
+				foreach ( $pages as $page ) {
+					add_submenu_page( Menu::SLUG, $page, $page, 'manage_options', $page, '__return_null' );
+				}
+			},
+			9
+		);
+
+		foreach ( $hooked as $callback ) {
+			add_action( 'admin_menu', $callback['function'], 9, $callback['accepted_args'] );
+		}
+	}
+
+	/**
+	 * Whether CP Essentials itself is active on the site.
+	 *
+	 * @return bool
+	 */
+	protected static function essentials_active() {
+		return function_exists( 'cp_essentials' );
+	}
+
+	/**
 	 * With CP Essentials hosting Settings (its page under the shared menu),
-	 * there is one Settings entry, Essentials' page is the first Settings
-	 * tab, and Essentials' own reordering (its Menu::order(), run with the
-	 * order the framework hands its filter) keeps the approved order.
+	 * there is one Church Plugins menu and one Settings entry, Essentials'
+	 * page is the first Settings tab, and Essentials' own reordering (its
+	 * Menu::order(), run with the order the framework hands its filter) keeps
+	 * the approved order. Uses CP Essentials itself when it is active, else
+	 * stand-in pages hooked the way it hooks.
 	 */
 	public function test_with_essentials_settings_host() {
 		$essentials = WP_PLUGIN_DIR . '/cp-essentials/includes/Admin/Menu.php';
@@ -337,21 +397,18 @@ class SharedMenuTest extends TestCase {
 			$this->markTestSkipped( 'CP Essentials is not installed.' );
 		}
 
-		require_once $essentials;
+		if ( ! self::essentials_active() ) {
+			require_once $essentials;
 
-		add_action(
-			'admin_menu',
-			static function () {
-				add_submenu_page( Menu::SLUG, 'Settings', 'Settings', 'manage_options', Menu::ESSENTIALS_SETTINGS, '__return_null' );
-				add_submenu_page( Menu::SLUG, 'Church Info', 'Church Info', 'manage_options', 'cp-essentials', '__return_null' );
-			},
-			9
-		);
+			self::hook_early_pages( array( Menu::ESSENTIALS_SETTINGS, 'cp-essentials' ) );
+		}
 
 		cp_fw_build_admin_menu( 'menuadmin' );
 
 		$entries = self::entries();
 
+		$this->assertSame( 1, count( array_keys( self::top_level(), Menu::SLUG, true ) ), 'One Church Plugins menu.' );
+		$this->assertNotContains( Menu::SLUG, $entries, 'No link from the menu to itself.' );
 		$this->assertSame( Menu::ESSENTIALS_SETTINGS, Menu::get_instance()->settings_entry() );
 		$this->assertSame( 1, count( array_keys( $entries, Menu::ESSENTIALS_SETTINGS, true ) ) );
 		$this->assertNotContains( 'admin.php?page=cpl_main_options', $entries, 'No second Settings entry.' );
@@ -365,5 +422,206 @@ class SharedMenuTest extends TestCase {
 		$this->assertSame( $entries, array_column( $reordered, 2 ), 'Essentials keeps the framework order.' );
 		$this->assertLessThan( array_search( 'cp-essentials', $entries, true ), array_search( 'edit.php?post_type=cp_staff', $entries, true ), 'Church Info comes after the content areas.' );
 		$this->assertLessThan( array_search( Menu::ESSENTIALS_SETTINGS, $entries, true ), array_search( 'cp-essentials', $entries, true ), 'Church Info comes before Settings.' );
+	}
+
+	/**
+	 * Build the menu for one plugin page as an administrator and check that
+	 * core registered the page under the shared menu and opens it.
+	 *
+	 * @param string $page Page slug.
+	 * @return void
+	 */
+	protected function assert_page_opens_under_shared_menu( $page ) {
+		global $_registered_pages, $_parent_pages;
+
+		// Core wp_die()s while it builds the menu when the page is refused.
+		add_action(
+			'admin_page_access_denied',
+			static function () {
+				throw new \RuntimeException( 'denied' );
+			}
+		);
+
+		cp_fw_build_admin_menu( 'menuadmin', 'admin.php', array( 'page' => $page ) );
+
+		$hook = 'church-plugins_page_' . $page;
+
+		$this->assertSame( 1, count( array_keys( self::top_level(), Menu::SLUG, true ) ), 'One Church Plugins menu.' );
+		$this->assertSame( Menu::SLUG, $_parent_pages[ $page ], 'The parent existed when the page was added.' );
+		$this->assertSame( $hook, get_plugin_page_hookname( $page, Menu::SLUG ) );
+		$this->assertSame( $hook, get_plugin_page_hook( $page, Menu::SLUG ) );
+		$this->assertArrayHasKey( $hook, $_registered_pages );
+		$this->assertArrayNotHasKey( 'admin_page_' . $page, $_registered_pages, 'Not registered as an orphan page.' );
+		$this->assertTrue( user_can_access_admin_page() );
+	}
+
+	/**
+	 * A page added at priority 9 from a hook registered before the
+	 * framework's (CP Essentials releases that used priority 9) finds the
+	 * parent already there.
+	 */
+	public function test_page_added_early_at_priority_9_opens() {
+		self::hook_early_pages( array( 'cp-fw-early-page' ) );
+
+		$this->assert_page_opens_under_shared_menu( 'cp-fw-early-page' );
+	}
+
+	/**
+	 * CP Essentials' own screens open under the shared menu.
+	 *
+	 * @dataProvider essentials_pages
+	 *
+	 * @param string $page Page slug.
+	 */
+	public function test_essentials_screens_open( $page ) {
+		if ( ! self::essentials_active() ) {
+			$this->markTestSkipped( 'CP Essentials is not active.' );
+		}
+
+		$this->assert_page_opens_under_shared_menu( $page );
+	}
+
+	/**
+	 * @return array
+	 */
+	public function essentials_pages() {
+		return array(
+			'Settings'    => array( Menu::ESSENTIALS_SETTINGS ),
+			'Church Info' => array( 'cp-essentials' ),
+		);
+	}
+
+	/**
+	 * Allow the current user only what a Subscriber has, without creating a
+	 * user on the site.
+	 *
+	 * @return void
+	 */
+	protected static function limit_to_subscriber() {
+		add_filter(
+			'user_has_cap',
+			static function () {
+				return array(
+					'read'       => true,
+					'level_0'    => true,
+					'subscriber' => true,
+				);
+			},
+			PHP_INT_MAX
+		);
+	}
+
+	/**
+	 * A Subscriber gets no Church Plugins menu: no entries are added for
+	 * screens they cannot open, so nothing keeps the top-level item alive.
+	 */
+	public function test_subscriber_gets_no_menu() {
+		self::limit_to_subscriber();
+
+		cp_fw_build_admin_menu( 'menueditor' );
+
+		$this->assertFalse( current_user_can( 'edit_posts' ), 'The harness user is limited to a Subscriber.' );
+		$this->assertNull( self::parent_item(), 'No Church Plugins menu.' );
+		$this->assertSame( array(), self::entries() );
+		$this->assertSame( array(), Menu::get_instance()->areas() );
+		$this->assertSame( '', Menu::get_instance()->settings_entry() );
+
+		foreach ( array( 'edit.php?post_type=cp_group', 'edit.php?post_type=cp_staff', 'edit.php?post_type=cpl_item_type', 'edit.php?post_type=cpl_item' ) as $old ) {
+			$this->assertNotContains( $old, self::top_level(), "{$old} is not shown either." );
+		}
+	}
+
+	/**
+	 * Every entry of the shared menu is one the user it is printed for can
+	 * open, so the top-level item (which core links to the first entry) never
+	 * leads to a refusal.
+	 *
+	 * @dataProvider menu_users
+	 *
+	 * @param string $login User login.
+	 */
+	public function test_every_entry_can_be_opened_by_the_user( $login ) {
+		cp_fw_build_admin_menu( $login );
+
+		$items = isset( $GLOBALS['submenu'][ Menu::SLUG ] ) ? $GLOBALS['submenu'][ Menu::SLUG ] : array();
+
+		$this->assertNotEmpty( $items );
+
+		foreach ( $items as $item ) {
+			$this->assertTrue( current_user_can( $item[1] ), "{$login} can open {$item[2]}." );
+		}
+	}
+
+	/**
+	 * @return array
+	 */
+	public function menu_users() {
+		return array(
+			'administrator' => array( 'menuadmin' ),
+			'editor'        => array( 'menueditor' ),
+		);
+	}
+
+	/**
+	 * A site with CP Essentials active when the shared menu first records
+	 * its state is not an existing install, whatever content it has:
+	 * Essentials fills the same post types under this same menu.
+	 */
+	public function test_notice_state_with_essentials_active() {
+		global $wpdb;
+
+		add_filter( 'cp_admin_menu_essentials_active', '__return_true' );
+
+		$wpdb->query( 'START TRANSACTION' );
+
+		try {
+			delete_option( MenuNotice::OPTION );
+			MenuNotice::get_instance()->record_state();
+			$state = get_option( MenuNotice::OPTION );
+
+			$this->assertIsArray( $state );
+			$this->assertFalse( $state['existing'] );
+		} finally {
+			$wpdb->query( 'ROLLBACK' );
+		}
+	}
+
+	/**
+	 * The license rows print keys: they are refused to a user who cannot
+	 * manage options, on whatever page a host prints them.
+	 */
+	public function test_license_rows_need_manage_options() {
+		cp_fw_build_admin_menu( 'menueditor' );
+
+		ob_start();
+		Licenses::get_instance()->render_rows();
+
+		$this->assertSame( '', ob_get_clean() );
+	}
+
+	/**
+	 * Each license row's fields have their own ids; names are shared, since
+	 * each row is its own form posted to the same handler.
+	 */
+	public function test_license_rows_have_unique_field_ids() {
+		cp_fw_build_admin_menu( 'menuadmin', 'admin.php', array( 'page' => Menu::LICENSES_SLUG ) );
+
+		ob_start();
+		Licenses::get_instance()->render_rows();
+		// Drop the values (license keys) so a failure message can never print one.
+		$html = (string) preg_replace( '/\\svalue=("[^"]*"|\'[^\']*\')/', '', (string) ob_get_clean() );
+
+		preg_match_all( '/<(?:input|select|textarea)\b[^>]*?\sid=["\']([^"\']+)["\']/', $html, $ids );
+		preg_match_all( '/<label\b[^>]*?\sfor=["\']([^"\']+)["\']/', $html, $fors );
+
+		$this->assertNotEmpty( $ids[1] );
+		$this->assertSame( array(), array_keys( array_filter( array_count_values( $ids[1] ), static function ( $count ) { return $count > 1; } ) ), 'No field id is used twice.' );
+		$this->assertSame( array(), array_values( array_diff( array_unique( $fors[1] ), $ids[1] ) ), 'Every label points at a field on the screen.' );
+
+		if ( count( Licenses::ids() ) > 1 && Licenses::get_instance()->has_moved_tabs() ) {
+			$this->assertTrue( false !== strpos( $html, 'name="license"' ), 'Posted field names are unchanged.' );
+			$this->assertFalse( strpos( $html, ' id="license"' ) );
+			$this->assertFalse( strpos( $html, ' for="beta"' ) );
+		}
 	}
 }

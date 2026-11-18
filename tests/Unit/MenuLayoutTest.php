@@ -316,6 +316,7 @@ class MenuLayoutTest extends TestCase {
 		$this->assertTrue( MenuLayout::is_existing_install( 3, false, false ) );
 		$this->assertTrue( MenuLayout::is_existing_install( 0, true, false ) );
 		$this->assertTrue( MenuLayout::is_existing_install( 0, false, true ) );
+		$this->assertFalse( MenuLayout::is_existing_install( 3, true, true, true ), 'A church that started on CP Essentials never saw the old menus.' );
 	}
 
 	/**
@@ -347,5 +348,101 @@ class MenuLayoutTest extends TestCase {
 
 		$this->assertSame( array( 'Groups', 'Types' ), array_column( MenuLayout::drop_foreign_taxonomies( $tabs, 'cp-groups', $owned ), 'label' ) );
 		$this->assertCount( 3, MenuLayout::drop_foreign_taxonomies( $tabs, 'cp-resources', $owned ) );
+	}
+
+	/**
+	 * A Subscriber (no `edit_posts`) gets no area: nothing is appended for
+	 * them, the old top-level items are left for core to remove, and the
+	 * shared menu has no entry that would keep it visible.
+	 */
+	public function test_subscriber_gets_no_areas_and_no_entries() {
+		$can = static function ( $capability ) {
+			return 'read' === $capability;
+		};
+
+		$menu  = $this->core_menu();
+		$areas = MenuLayout::accessible_areas( MenuLayout::plan_areas( $menu, $this->products() ), $can );
+
+		$this->assertSame( array(), $areas );
+
+		list( $new_menu, $submenu ) = MenuLayout::apply_areas( $menu, array(), $areas );
+
+		$this->assertSame( $menu, $new_menu, 'Core removes the old items for this user, as before.' );
+		$this->assertSame( array(), $submenu['church-plugins'] );
+		$this->assertFalse( MenuLayout::has_accessible_item( $submenu['church-plugins'], $can ) );
+	}
+
+	/**
+	 * An editor keeps every area whose capability they hold; an area with its
+	 * own capability they lack does not move.
+	 */
+	public function test_accessible_areas_keeps_what_the_user_can_open() {
+		$can = static function ( $capability ) {
+			return in_array( $capability, array( 'read', 'edit_posts' ), true );
+		};
+
+		$menu     = $this->core_menu();
+		$menu[28] = array( 'Staff', 'edit_cp_staff', 'edit.php?post_type=cp_staff', '', 'menu-top' );
+
+		$areas = MenuLayout::accessible_areas( MenuLayout::plan_areas( $menu, $this->products() ), $can );
+
+		$this->assertSame( array( 'cp-library', 'cp-groups' ), array_keys( $areas ) );
+
+		list( $new_menu, $submenu ) = MenuLayout::apply_areas( $menu, array(), $areas );
+
+		$this->assertContains( 'edit.php?post_type=cp_staff', array_column( $new_menu, 2 ), 'The area the user cannot open stays where it was.' );
+		$this->assertNotContains( 'edit.php?post_type=cp_staff', array_column( $submenu['church-plugins'], 2 ) );
+		$this->assertTrue( MenuLayout::has_accessible_item( $submenu['church-plugins'], $can ) );
+	}
+
+	/**
+	 * Entries the user cannot open, and the parent's link to itself, do not
+	 * keep the shared menu visible.
+	 */
+	public function test_has_accessible_item_ignores_the_self_link_and_closed_entries() {
+		$can = static function ( $capability ) {
+			return 'edit_posts' === $capability;
+		};
+
+		$items = array(
+			array( 'Church Plugins', 'edit_posts', 'church-plugins', 'Church Plugins' ),
+			array( 'Settings', 'manage_options', 'admin.php?page=cpl_main_options', 'Settings' ),
+			array( 'Licenses', 'manage_options', 'cp-licenses', 'Licenses' ),
+		);
+
+		$this->assertFalse( MenuLayout::has_accessible_item( $items, $can ) );
+
+		$items[] = array( 'Groups', 'edit_posts', 'edit.php?post_type=cp_group', 'Groups' );
+
+		$this->assertTrue( MenuLayout::has_accessible_item( $items, $can ) );
+	}
+
+	/**
+	 * Two license boxes on one screen: ids and label targets become unique,
+	 * names (what the form posts) stay.
+	 */
+	public function test_prefix_field_ids_keeps_names_and_separates_rows() {
+		$box = '<label for="license">License Key</label><input type="text" name="license" id="license" value="">'
+			. '<input type="checkbox" class="cmb2-option" name="beta" id="beta" value="on"> <label for="beta">Enable</label>'
+			. '<div class="cmb2-id-beta" data-fieldtype="checkbox"></div><input type="hidden" id="nonce_CMB2phpcpl" name="nonce_CMB2phpcpl">';
+
+		$sermons = MenuLayout::prefix_field_ids( $box, array( 'license', 'beta' ), 'cpl_license' );
+		$groups  = MenuLayout::prefix_field_ids( $box, array( 'license', 'beta' ), 'cp_groups_license' );
+
+		$this->assertStringContainsString( '<label for="cpl_license-license">', $sermons );
+		$this->assertStringContainsString( 'name="license" id="cpl_license-license"', $sermons );
+		$this->assertStringContainsString( 'name="beta" id="cpl_license-beta"', $sermons );
+		$this->assertStringContainsString( '<label for="cpl_license-beta">', $sermons );
+		$this->assertStringContainsString( 'id="nonce_CMB2phpcpl" name="nonce_CMB2phpcpl"', $sermons, 'Other ids are left alone.' );
+		$this->assertStringContainsString( 'class="cmb2-id-beta"', $sermons );
+
+		preg_match_all( '/\\s(?:id|for)="([^"]+)"/', $sermons . $groups, $found );
+
+		$ids = array_diff( $found[1], array( 'nonce_CMB2phpcpl' ) );
+
+		$this->assertCount( 8, $ids );
+		$this->assertSame( array( 2 ), array_values( array_unique( array_count_values( $ids ) ) ), 'Each id is used by one field and its one label.' );
+		$this->assertStringNotContainsString( 'id="license"', $sermons . $groups );
+		$this->assertStringNotContainsString( 'for="beta"', $sermons . $groups );
 	}
 }

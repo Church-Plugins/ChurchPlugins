@@ -335,9 +335,17 @@ class Licenses {
 	/**
 	 * Print one row per license.
 	 *
+	 * Public so a hub can host the rows on its own page
+	 * (`cp_admin_licenses_page`). The rows print license keys, so this checks
+	 * the capability itself and does not rely on the page that calls it.
+	 *
 	 * @return void
 	 */
 	public function render_rows() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
 		echo '<style>.cp-licenses__row{background:#fff;border:1px solid #c3c4c7;margin:16px 0;max-width:960px}.cp-licenses__head{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #f0f0f1}.cp-licenses__head h2{margin:0;font-size:15px}.cp-licenses__body{padding:0 16px 8px}.cp-licenses__body .cmb2-wrap .cmb-row{padding:12px 0}.cp-licenses__status{border-radius:2px;padding:2px 8px;font-size:12px;background:#f0f0f1;color:#50575e}.cp-licenses__status.is-valid{background:#edfaef;color:#00650f}.cp-licenses__status.is-problem{background:#fcf0f1;color:#8a2424}.cp-licenses__rest{display:flex;gap:8px;align-items:center;padding:12px 0}.cp-licenses__rest input{min-width:280px}</style>';
 
 		foreach ( $this->rows() as $row ) {
@@ -403,6 +411,12 @@ class Licenses {
 	 * CMB2 saves the key and the License's admin_init handlers see the
 	 * Activate / Deactivate buttons exactly as before.
 	 *
+	 * Every product's box uses the field ids `license` and `beta`. Printed on
+	 * one screen they would collide (a click on one row's label would toggle
+	 * another row's checkbox), so each row's field ids and label targets are
+	 * prefixed with its license id. Field names, and so the posted data and
+	 * the save handler, are unchanged.
+	 *
 	 * @param \CMB2  $cmb CMB2 box.
 	 * @param string $id  License id (option key).
 	 * @return void
@@ -419,7 +433,10 @@ class Licenses {
 			esc_attr( $id )
 		);
 
+		ob_start();
 		$cmb->show_form( $id, 'options-page' );
+
+		echo MenuLayout::prefix_field_ids( ob_get_clean(), array_keys( (array) $cmb->prop( 'fields' ) ), $id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- CMB2's own form markup, ids prefixed.
 
 		submit_button( __( 'Save', 'churchplugins' ), 'secondary', 'submit-cmb', true, array( 'id' => 'submit-cmb-' . $id ) );
 		echo '</form>';
