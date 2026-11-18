@@ -124,6 +124,14 @@ class Menu {
 	protected $settings_entry = '';
 
 	/**
+	 * Hook suffix returned by add_menu_page() for the parent slug.
+	 *
+	 * @var string
+	 * @since 1.1.23
+	 */
+	protected $parent_hook = '';
+
+	/**
 	 * Settings tabs this request, cached once the menu is built.
 	 *
 	 * @var array|null
@@ -416,12 +424,12 @@ class Menu {
 		 */
 		$capability = apply_filters( 'cp_admin_menu_capability', $content ? 'edit_posts' : 'manage_options' );
 
-		add_menu_page(
+		$hook = add_menu_page(
 			__( 'Church Plugins', 'churchplugins' ),
 			__( 'Church Plugins', 'churchplugins' ),
 			$capability,
 			self::SLUG,
-			array( $this, 'redirect_parent' ),
+			array( $this, 'render_parent' ),
 			$this->get_menu_icon(),
 			/**
 			 * Filters the position of the Church Plugins menu.
@@ -434,6 +442,14 @@ class Menu {
 			 */
 			apply_filters( 'cp_admin_menu_position', $content ? self::CONTENT_POSITION : 80 )
 		);
+
+		// admin.php runs load-{$hook} before it includes admin-header.php, and
+		// the page callback only after that include.
+		$this->parent_hook = is_string( $hook ) ? $hook : '';
+
+		if ( '' !== $this->parent_hook ) {
+			add_action( 'load-' . $this->parent_hook, array( $this, 'redirect_parent' ) );
+		}
 	}
 
 	/**
@@ -451,11 +467,10 @@ class Menu {
 	}
 
 	/**
-	 * Send a direct visit to the parent slug to the first entry.
+	 * Send a direct visit to the parent slug to the first submenu entry.
 	 *
-	 * The parent has no screen of its own. An empty callback makes core try
-	 * to include a file named `church-plugins` and die with "Cannot load
-	 * church-plugins."
+	 * Hooked to `load-{$hook}` so it runs before admin-header.php. The page
+	 * callback runs after that file has been included.
 	 *
 	 * @return void
 	 * @since 1.1.23
@@ -463,6 +478,20 @@ class Menu {
 	public function redirect_parent() {
 		wp_safe_redirect( $this->first_url() );
 		exit;
+	}
+
+	/**
+	 * Fallback for the parent slug: a link to the first submenu entry.
+	 *
+	 * @return void
+	 * @since 1.1.23
+	 */
+	public function render_parent() {
+		printf(
+			'<div class="wrap"><p><a href="%1$s">%2$s</a></p></div>',
+			esc_url( $this->first_url() ),
+			esc_html__( 'Church Plugins', 'churchplugins' )
+		);
 	}
 
 	/**

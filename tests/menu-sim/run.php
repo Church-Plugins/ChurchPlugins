@@ -39,7 +39,8 @@
  *                    `screen.block_editor` makes get_current_screen() report
  *                    a block editor. `tabs` prints the tab bar, body class
  *                    and inline styles for that screen. `dispatch` runs the
- *                    plugin page the way wp-admin/admin.php does.
+ *                    plugin page the way wp-admin/admin.php does: `load-{$hook}`,
+ *                    then the admin header, then the page callback.
  *   render           string[]  'notice', 'licenses'.
  *
  * @package ChurchPlugins
@@ -750,21 +751,35 @@ foreach ( array( '' => array( 'pagenow' => 'index.php', 'get' => array() ) ) + $
 		$result['styles'] = $GLOBALS['sim_styles'];
 	}
 
-	// wp-admin/admin.php: a page with a callback runs it; a page with none
-	// is included as a plugin file, which dies with "Cannot load %s."
+	// wp-admin/admin.php includes admin-header.php after load-{$hook} and
+	// before the page callback. A page with no callback is included as a
+	// plugin file, which dies with "Cannot load %s."
 	if ( ! empty( $request['dispatch'] ) && isset( $plugin_page ) && ! isset( $result['redirect'] ) ) {
 		if ( empty( $result['access'] ) ) {
 			$result['die'] = 'Sorry, you are not allowed to access this page.';
 		} elseif ( ! empty( $result['hook'] ) ) {
+			$result['output']      = '';
+			$result['header_sent'] = false;
+			$buffers               = ob_get_level();
+
 			try {
 				do_action( 'load-' . $result['hook'] );
+				$result['header_sent'] = true;
+				$result['output']      = '<div id="wpbody">';
+				ob_start();
 				do_action( $result['hook'] );
+				$result['output']    .= ob_get_clean();
 				$result['dispatched'] = true;
 			} catch ( SimDie $e ) {
+				while ( ob_get_level() > $buffers ) {
+					$result['output'] .= ob_get_clean();
+				}
+
 				$message = $e->getMessage();
 
 				if ( 0 === strpos( $message, 'REDIRECT ' ) ) {
-					$result['redirect'] = substr( $message, 9 );
+					$result['redirect']    = substr( $message, 9 );
+					$result['redirect_at'] = $result['header_sent'] ? 'callback' : 'load';
 				} else {
 					$result['die'] = $message;
 				}

@@ -950,8 +950,8 @@ class SharedMenuSimulationTest extends TestCase {
 	}
 
 	/**
-	 * admin.php?page=church-plugins opens the first entry. An empty parent
-	 * callback used to die with "Cannot load church-plugins."
+	 * admin.php?page=church-plugins redirects on load-{$hook}, before the
+	 * admin header. The page callback is not reached.
 	 */
 	public function test_parent_page_redirects_for_one_plugin_and_for_two() {
 		$cases = array(
@@ -997,6 +997,9 @@ class SharedMenuSimulationTest extends TestCase {
 			$this->assertTrue( $asked['access'], $label );
 			$this->assertSame( 'toplevel_page_church-plugins', $asked['hook'], $label );
 			$this->assertArrayNotHasKey( 'die', $asked, $label );
+			$this->assertSame( 'load', $asked['redirect_at'], $label );
+			$this->assertFalse( $asked['header_sent'], $label );
+			$this->assertSame( '', $asked['output'], $label );
 			$this->assertSame(
 				'http://sim/wp-admin/' . $case['entries'][0],
 				$asked['redirect'],
