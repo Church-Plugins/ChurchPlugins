@@ -124,6 +124,14 @@ class Menu {
 	protected $settings_entry = '';
 
 	/**
+	 * Hook suffix returned by add_menu_page() for the parent slug.
+	 *
+	 * @var string
+	 * @since 1.1.23
+	 */
+	protected $parent_hook = '';
+
+	/**
 	 * Settings tabs this request, cached once the menu is built.
 	 *
 	 * @var array|null
@@ -416,12 +424,12 @@ class Menu {
 		 */
 		$capability = apply_filters( 'cp_admin_menu_capability', $content ? 'edit_posts' : 'manage_options' );
 
-		add_menu_page(
+		$hook = add_menu_page(
 			__( 'Church Plugins', 'churchplugins' ),
 			__( 'Church Plugins', 'churchplugins' ),
 			$capability,
 			self::SLUG,
-			'',
+			array( $this, 'render_parent' ),
 			$this->get_menu_icon(),
 			/**
 			 * Filters the position of the Church Plugins menu.
@@ -434,6 +442,14 @@ class Menu {
 			 */
 			apply_filters( 'cp_admin_menu_position', $content ? self::CONTENT_POSITION : 80 )
 		);
+
+		// admin.php runs load-{$hook} before it includes admin-header.php, and
+		// the page callback only after that include.
+		$this->parent_hook = is_string( $hook ) ? $hook : '';
+
+		if ( '' !== $this->parent_hook ) {
+			add_action( 'load-' . $this->parent_hook, array( $this, 'redirect_parent' ) );
+		}
 	}
 
 	/**
@@ -448,6 +464,34 @@ class Menu {
 		if ( ! self::parent_registered() ) {
 			$this->register_menu();
 		}
+	}
+
+	/**
+	 * Send a direct visit to the parent slug to the first submenu entry.
+	 *
+	 * Hooked to `load-{$hook}` so it runs before admin-header.php. The page
+	 * callback runs after that file has been included.
+	 *
+	 * @return void
+	 * @since 1.1.23
+	 */
+	public function redirect_parent() {
+		wp_safe_redirect( $this->first_url() );
+		exit;
+	}
+
+	/**
+	 * Fallback for the parent slug: a link to the first submenu entry.
+	 *
+	 * @return void
+	 * @since 1.1.23
+	 */
+	public function render_parent() {
+		printf(
+			'<div class="wrap"><p><a href="%1$s">%2$s</a></p></div>',
+			esc_url( $this->first_url() ),
+			esc_html__( 'Church Plugins', 'churchplugins' )
+		);
 	}
 
 	/**
@@ -1284,38 +1328,31 @@ class Menu {
 	/**
 	 * Print the tab bar across the top of an area's (or Settings') screens.
 	 *
+	 * Not on block-editor screens. The bar and the offset that went with it
+	 * sat over the pre-publish panel. List and classic-editor screens are
+	 * unchanged.
+	 *
 	 * @return void
 	 * @since 1.1.23
 	 */
 	public function tabs() {
+		if ( self::is_block_editor() ) {
+			return;
+		}
+
 		$current = $this->current();
 
 		if ( ! $current ) {
 			return;
 		}
 
-		$editor = self::is_block_editor();
-		$html   = $this->render_tabs( $current['group'], $current['tab'], $editor ? 'cp-admin-tabs--editor' : '' );
-
-		echo $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in render_tabs().
-
-		if ( $editor && '' !== $html ) {
-			if ( function_exists( 'wp_print_inline_script_tag' ) ) {
-				wp_print_inline_script_tag( self::editor_guard() );
-			} else {
-				echo '<script>' . self::editor_guard() . '</script>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Static script.
-			}
-		}
+		echo $this->render_tabs( $current['group'], $current['tab'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in render_tabs().
 	}
 
 	/**
-	 * Script that keeps the block editor's tab bar from ever covering the
-	 * editor (the safeguard CP Essentials uses for its bar). It waits for the
-	 * editor's frame (.interface-interface-skeleton); if the frame never
-	 * appears, or does not start below the bar (a layout this code does not
-	 * know, now or after a WordPress update), the bar is hidden and the
-	 * editor gets its full height back. Checked as the editor loads and
-	 * whenever the window or the frame resizes.
+	 * Script that hid the block-editor tab bar when its frame did not start
+	 * below the bar. Block-editor screens no longer print the bar, so nothing
+	 * prints this script.
 	 *
 	 * @return string
 	 * @since 1.1.23
@@ -1414,31 +1451,26 @@ class Menu {
 	}
 
 	/**
-	 * Body class for the block editor's tab bar offset.
+	 * Body class. The block editor does not get a tab-bar offset.
 	 *
 	 * @param string $classes Classes.
 	 * @return string
 	 * @since 1.1.23
 	 */
 	public function body_class( $classes ) {
-		$current = self::is_block_editor() ? $this->current() : null;
-
-		if ( $current && '' !== $this->render_tabs( $current['group'], $current['tab'] ) ) {
-			$classes .= ' cp-has-editor-tabs';
-		}
-
 		return $classes;
 	}
 
 	/**
-	 * Tab bar styles. In the block editor the bar sits above the editor,
-	 * which is moved down by the bar's height (as CP Essentials does).
+	 * Tab bar styles for list and classic-editor screens.
+	 *
+	 * Block-editor screens get none: the offset covered the pre-publish panel.
 	 *
 	 * @return void
 	 * @since 1.1.23
 	 */
 	public function styles() {
-		if ( ! $this->current() ) {
+		if ( self::is_block_editor() || ! $this->current() ) {
 			return;
 		}
 
