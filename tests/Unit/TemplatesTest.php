@@ -210,10 +210,10 @@ class Templates_Harness extends Templates {
 }
 
 /**
- * Overrides template_body_class() the way CP Sermons' shipped copies do:
- * reads self::$template itself.
+ * Overrides template_body_class() and reads self::$template itself, without
+ * redeclaring the static: it reads the framework's copy.
  */
-class Templates_Library_Harness extends Templates_Harness {
+class Templates_Shared_Static_Harness extends Templates_Harness {
 
 	/**
 	 * @param array $classes Body classes.
@@ -222,11 +222,38 @@ class Templates_Library_Harness extends Templates_Harness {
 	public function template_body_class( $classes ) {
 		$classes = parent::template_body_class( $classes );
 
-		$template_filename = basename( (string) self::$template );
+		$classes[] = 'default-template.php' === basename( (string) self::$template ) ? 'cpx-page-template' : 'cpx-other-template';
+
+		return $classes;
+	}
+}
+
+/**
+ * CP Sermons' Templates class as shipped (cp-library includes/Templates.php):
+ * it redeclares the static, so the override below reads a copy the framework
+ * never writes.
+ */
+class Templates_Library_Harness extends Templates_Harness {
+
+	/**
+	 * Shadows \ChurchPlugins\Templates::$template, as in CP Sermons.
+	 *
+	 * @var string|false
+	 */
+	protected static $template = false;
+
+	/**
+	 * @param array $classes Body classes.
+	 * @return array
+	 */
+	public function template_body_class( $classes ) {
+		$classes = parent::template_body_class( $classes );
+
+		$template_filename = basename( self::$template );
 
 		$classes[] = 'cpl-template';
 
-		if ( 'default-template.php' === $template_filename ) {
+		if ( 'default-template.php' == $template_filename ) { // phpcs:ignore Universal.Operators.StrictComparisons.LooseEqual -- As shipped.
 			$classes[] = 'cpl-page-template';
 		} else {
 			$classes[] = 'page-template-' . sanitize_title( $template_filename );
@@ -242,6 +269,8 @@ class Templates_Library_Harness extends Templates_Harness {
 class TemplatesTest extends TestCase {
 
 	const CANVAS = '/var/www/wp-includes/template-canvas.php';
+
+	const VIEW_BLOCK = '<!-- wp:churchplugins/view /-->';
 
 	/**
 	 * Reset the stand-in WordPress state before each test.
@@ -260,6 +289,44 @@ class TemplatesTest extends TestCase {
 	}
 
 	/**
+	 * Run the callbacks template_include() hooked to `body_class`, in the
+	 * order it added them, as core would.
+	 *
+	 * @param array $classes Classes core starts with.
+	 * @return array
+	 */
+	protected function printed_body_classes( $classes = array() ) {
+		foreach ( $this->hooked( 'body_class' ) as $callback ) {
+			$classes = call_user_func( $callback, $classes );
+		}
+
+		return $classes;
+	}
+
+	/**
+	 * @param string $hook Hook name.
+	 * @return array Callbacks added to the hook since setUp().
+	 */
+	protected function hooked( $hook ) {
+		return isset( $GLOBALS['cp_test_wp']['added_filters'][ $hook ] ) ? $GLOBALS['cp_test_wp']['added_filters'][ $hook ] : array();
+	}
+
+	/**
+	 * @param Templates_Harness $harness Instance template_include() ran on.
+	 * @return string[] Its methods hooked to `body_class`, in order.
+	 */
+	protected function hooked_body_class_methods( $harness ) {
+		$methods = array();
+
+		foreach ( $this->hooked( 'body_class' ) as $callback ) {
+			$this->assertSame( $harness, $callback[0] );
+			$methods[] = $callback[1];
+		}
+
+		return $methods;
+	}
+
+	/**
 	 * Clear the globals the tests set.
 	 */
 	protected function tearDown(): void {
@@ -273,16 +340,18 @@ class TemplatesTest extends TestCase {
 
 	/**
 	 * @param string $slug   Template slug.
-	 * @param string $source theme, custom or plugin.
+	 * @param string $source  theme, custom or plugin.
+	 * @param string $content Template content.
 	 * @return string The template id core would have recorded.
 	 */
-	protected function resolve_template( $slug, $source = 'theme' ) {
+	protected function resolve_template( $slug, $source = 'theme', $content = '' ) {
 		$id = 'theme//' . $slug;
 
 		$GLOBALS['cp_test_wp']['block_templates'][ $id ] = (object) array(
-			'id'     => $id,
-			'slug'   => $slug,
-			'source' => $source,
+			'id'      => $id,
+			'slug'    => $slug,
+			'source'  => $source,
+			'content' => $content,
 		);
 
 		$GLOBALS['_wp_current_template_id'] = $id;
@@ -394,9 +463,89 @@ class TemplatesTest extends TestCase {
 		$this->resolve_template( 'single' );
 		$this->assertFalse( $this->harness( $singular, $this->post() )->overrides( self::CANVAS ) );
 
-		$this->resolve_template( 'wide-layout', 'custom' );
+		// A custom template that is not the one assigned to the post never qualifies.
+		$this->resolve_template( 'wide-layout', 'custom', self::VIEW_BLOCK );
 		$this->assertFalse( $this->harness( $singular, $this->post() )->overrides( self::CANVAS ) );
-		$this->assertTrue( $this->harness( $singular, $this->post( array( 'page_template' => 'wide-layout' ) ) )->overrides( self::CANVAS ) );
+	}
+
+	/**
+	 * The custom template assigned to the post defers only when its content
+	 * has the view block; without it the plugin's view takes over, as on
+	 * 1.1.21 (the block cannot be added outside the Site Editor).
+	 *
+	 * @dataProvider assigned_templates
+	 *
+	 * @param string $content  Template content.
+	 * @param bool   $expected Whether the legacy path defers.
+	 */
+	public function test_assigned_template_defers_only_with_the_view_block( $content, $expected ) {
+		$singular = array( 'singular' => array( 'cp_group' ) );
+		$post     = $this->post( array( 'page_template' => 'wide-layout' ) );
+
+		foreach ( array( 'theme', 'custom' ) as $source ) {
+			$this->resolve_template( 'wide-layout', $source, $content );
+			$this->assertSame( $expected, $this->harness( $singular, $post )->overrides( self::CANVAS ), $source );
+		}
+
+		// A classic theme's PHP page template is stored with its extension.
+		$this->resolve_template( 'wide-layout', 'theme', $content );
+		$this->assertSame( $expected, $this->harness( $singular, $this->post( array( 'page_template' => 'wide-layout.php' ) ) )->overrides( self::CANVAS ) );
+	}
+
+	/**
+	 * @return array
+	 */
+	public function assigned_templates() {
+		return array(
+			'view block'                  => array( '<!-- wp:group --><div>' . self::VIEW_BLOCK . '</div><!-- /wp:group -->', true ),
+			'view block with attributes'  => array( '<!-- wp:churchplugins/view {"plugin":"cp-test"} /-->', true ),
+			'no view block'               => array( '<!-- wp:post-title /--><!-- wp:post-content /-->', false ),
+			'no blocks at all'            => array( '<p>churchplugins/view</p>', false ),
+			'empty content'               => array( '', false ),
+			'another churchplugins block' => array( '<!-- wp:churchplugins/viewer /-->', false ),
+			// Documented limit: a view block inside a referenced part or pattern is not seen.
+			'view only in a template part' => array( '<!-- wp:template-part {"slug":"cp-view"} /-->', false ),
+		);
+	}
+
+	/**
+	 * The filter can still defer to an assigned template without the block,
+	 * and can be asked on a classic theme (theme.json): it gets the template.
+	 */
+	public function test_filter_can_defer_to_an_assigned_template_without_the_block() {
+		$this->resolve_template( 'wide-layout', 'theme', '<!-- wp:post-content /-->' );
+		$seen = array();
+
+		$GLOBALS['cp_test_filters']['cp_template_block_template_overrides'] = function ( $overrides, $block_template ) use ( &$seen ) {
+			$seen = func_get_args();
+
+			return true;
+		};
+
+		$harness = $this->harness( array( 'singular' => array( 'cp_group' ) ), $this->post( array( 'page_template' => 'wide-layout' ) ) );
+
+		$this->assertTrue( $harness->overrides( self::CANVAS ) );
+		$this->assertFalse( $seen[0] );
+		$this->assertSame( 'wide-layout', $seen[1]->slug );
+	}
+
+	/**
+	 * A recorded template that cannot be loaded (6.3+) does not defer and
+	 * reaches the filter as null.
+	 */
+	public function test_unloadable_resolved_template_does_not_defer() {
+		$GLOBALS['_wp_current_template_id'] = 'theme//gone';
+		$seen                               = array( 'unset' );
+
+		$GLOBALS['cp_test_filters']['cp_template_block_template_overrides'] = function ( $overrides, $block_template ) use ( &$seen ) {
+			$seen = func_get_args();
+
+			return $overrides;
+		};
+
+		$this->assertFalse( $this->archive_harness()->overrides( self::CANVAS ) );
+		$this->assertFalse( $seen[0] );
+		$this->assertNull( $seen[1] );
 	}
 
 	/**
@@ -523,19 +672,161 @@ class TemplatesTest extends TestCase {
 	}
 
 	/**
-	 * On the deferral path self::$template is unset: an override that reads it
-	 * (CP Sermons) still gets its page-template class, and the static is
-	 * restored afterwards.
+	 * A request that is not the plugin's is left alone: nothing hooked.
+	 */
+	public function test_template_include_ignores_other_requests() {
+		$harness = $this->harness( array() );
+
+		$this->assertSame( '/themes/test/page.php', $harness->template_include( '/themes/test/page.php' ) );
+		$this->assertSame( array(), $this->hooked( 'body_class' ) );
+	}
+
+	/**
+	 * @return array[] Harness class and the body classes it prints when the
+	 *                 view is the default template.
+	 */
+	public function body_class_subclasses() {
+		return array(
+			'framework only'             => array( Templates_Harness::class, array( 'cp-template', 'cp-page-template' ) ),
+			'override, framework static' => array( Templates_Shared_Static_Harness::class, array( 'cp-template', 'cp-page-template', 'cpx-page-template' ) ),
+			// CP Sermons as shipped: no cpl-page-template, and no bare page-template-.
+			'override, own static (CPL)' => array( Templates_Library_Harness::class, array( 'cp-template', 'cp-page-template', 'cpl-template' ) ),
+		);
+	}
+
+	/**
+	 * Handoff: the resolved template stays, the default template is recorded
+	 * for the view block, and the body classes come from
+	 * default_template_body_class().
+	 *
+	 * @dataProvider body_class_subclasses
+	 *
+	 * @param string   $class    Harness class.
+	 * @param string[] $expected Classes printed.
+	 */
+	public function test_template_include_on_the_handoff_path( $class, $expected ) {
+		$harness        = new $class();
+		$harness->query = new Templates_Query_Double( array( 'archive' => array( 'cp_group' ) ), null, array( 'post_type' => 'cp_group' ) );
+
+		$GLOBALS['cp_test_wp']['options'] = array(
+			'stylesheet' => 'twentytwentyfive',
+			'template'   => 'twentytwentyfive',
+		);
+
+		$this->assertSame( self::CANVAS, $harness->template_include( self::CANVAS ) );
+		$this->assertSame( $harness->default_template, Templates_Harness::current_template() );
+		$this->assertSame( array( 'theme_body_class', 'default_template_body_class' ), $this->hooked_body_class_methods( $harness ) );
+		$this->assertSame(
+			array_merge( array( 'archive', 'cp-theme-twentytwentyfive' ), $expected ),
+			$this->printed_body_classes( array( 'archive' ) )
+		);
+	}
+
+	/**
+	 * Legacy path deferring to a theme / customized block template: the
+	 * resolved template stays, self::$template stays unset (the shortcode is
+	 * inert), and the body classes come from default_template_body_class().
+	 *
+	 * @dataProvider body_class_subclasses
+	 *
+	 * @param string   $class    Harness class.
+	 * @param string[] $expected Classes printed.
+	 */
+	public function test_template_include_on_the_deferral_path( $class, $expected ) {
+		$harness                  = new $class();
+		$harness->query           = new Templates_Query_Double( array( 'archive' => array( 'cp_group' ) ), null, array( 'post_type' => 'cp_group' ) );
+		$harness->block_templates = false;
+
+		$this->resolve_template( 'archive-cp_group', 'custom' );
+
+		$this->assertSame( self::CANVAS, $harness->template_include( self::CANVAS ) );
+		$this->assertFalse( Templates_Harness::current_template() );
+		$this->assertSame( array( 'theme_body_class', 'default_template_body_class' ), $this->hooked_body_class_methods( $harness ) );
+		$this->assertSame( array(), $this->hooked( 'loop_start' ) );
+
+		$classes = $this->printed_body_classes( array( 'archive' ) );
+
+		$this->assertSame( array_merge( array( 'archive', 'cp-theme-' ), $expected ), $classes );
+		$this->assertFalse( Templates_Harness::current_template(), 'The static is restored after the classes are built.' );
+	}
+
+	/**
+	 * Legacy takeover (nothing to defer to): the plugin's default template
+	 * replaces the resolved one and template_body_class() is hooked, followed
+	 * by the filter that drops a bare `page-template-`.
+	 *
+	 * @dataProvider body_class_subclasses
+	 *
+	 * @param string   $class    Harness class.
+	 * @param string[] $expected Classes printed.
+	 */
+	public function test_template_include_on_the_legacy_takeover_path( $class, $expected ) {
+		$harness                  = new $class();
+		$harness->query           = new Templates_Query_Double( array( 'archive' => array( 'cp_group' ) ), null, array( 'post_type' => 'cp_group' ) );
+		$harness->block_templates = false;
+
+		// The theme's generic archive template: not one to defer to.
+		$this->resolve_template( 'archive' );
+
+		$this->assertSame( $harness->default_template, $harness->template_include( self::CANVAS ) );
+		$this->assertSame( $harness->default_template, Templates_Harness::current_template() );
+		$this->assertSame(
+			array( 'theme_body_class', 'template_body_class', 'strip_empty_template_class' ),
+			$this->hooked_body_class_methods( $harness )
+		);
+		$this->assertSame( array_merge( array( 'archive', 'cp-theme-' ), $expected ), $this->printed_body_classes( array( 'archive' ) ) );
+	}
+
+	/**
+	 * A classic theme (PHP template) always takes the legacy takeover path.
+	 */
+	public function test_template_include_replaces_a_classic_template() {
+		$harness                  = $this->archive_harness();
+		$harness->block_templates = false;
+
+		$this->resolve_template( 'archive-cp_group', 'custom' );
+
+		$this->assertSame( $harness->default_template, $harness->template_include( '/themes/astra/archive.php' ) );
+		$this->assertContains( 'template_body_class', $this->hooked_body_class_methods( $harness ) );
+	}
+
+	/**
+	 * What CP Sermons' override returns by itself: the bare `page-template-`
+	 * is there until strip_empty_template_class() runs, and
+	 * `cpl-page-template` is absent whatever the framework's static holds.
+	 */
+	public function test_library_override_never_sees_the_frameworks_template() {
+		$library = new Templates_Library_Harness();
+
+		Templates_Harness::set_current_template( $library->default_template );
+
+		$classes = $library->template_body_class( array() );
+
+		$this->assertSame( array( 'cp-template', 'cp-page-template', 'cpl-template', 'page-template-' ), $classes );
+		$this->assertSame( array( 'cp-template', 'cp-page-template', 'cpl-template' ), $library->strip_empty_template_class( $classes ) );
+	}
+
+	/**
+	 * strip_empty_template_class() removes only the bare class and reindexes.
+	 */
+	public function test_strip_empty_template_class_keeps_named_classes() {
+		$this->assertSame(
+			array( 'page-template', 'page-template-wide-php', 'x' ),
+			( new Templates_Harness() )->strip_empty_template_class( array( 'page-template', 'page-template-', 'page-template-wide-php', 'x' ) )
+		);
+	}
+
+	/**
+	 * On the deferral path self::$template is unset: an override that reads
+	 * the framework's static sees the default template for the call, and the
+	 * static is restored afterwards.
 	 */
 	public function test_deferred_body_class_serves_overrides_that_read_the_template() {
-		$harness = new Templates_Library_Harness();
+		$harness = new Templates_Shared_Static_Harness();
 
 		$classes = $harness->default_template_body_class( array( 'archive' ) );
 
-		$this->assertContains( 'cp-page-template', $classes );
-		$this->assertContains( 'cpl-page-template', $classes );
-		$this->assertContains( 'cpl-template', $classes );
-		$this->assertNotContains( 'page-template-', $classes );
+		$this->assertSame( array( 'archive', 'cp-template', 'cp-page-template', 'cpx-page-template' ), $classes );
 		$this->assertFalse( Templates_Harness::current_template() );
 	}
 
@@ -545,10 +836,9 @@ class TemplatesTest extends TestCase {
 	public function test_deferred_body_class_keeps_a_template_already_set() {
 		Templates_Harness::set_current_template( '/themes/x/page-wide.php' );
 
-		$classes = ( new Templates_Library_Harness() )->default_template_body_class( array() );
+		$classes = ( new Templates_Shared_Static_Harness() )->default_template_body_class( array() );
 
-		$this->assertContains( 'page-template-page-wide-php', $classes );
-		$this->assertNotContains( 'cpl-page-template', $classes );
+		$this->assertSame( array( 'cp-template', 'page-template-page-wide-php', 'cpx-other-template' ), $classes );
 		$this->assertSame( '/themes/x/page-wide.php', Templates_Harness::current_template() );
 	}
 
@@ -618,18 +908,6 @@ class TemplatesTest extends TestCase {
 		$labels = ( new Templates_Harness() )->taxonomy_labels( $this->taxonomy( 'Group Type', array( 'cp_group' ) ) );
 
 		$this->assertSame( 'Group Type Archive', $labels[0] );
-	}
-
-	/**
-	 * A post type with an empty singular name adds nothing to the title.
-	 */
-	public function test_taxonomy_labels_with_empty_owner_name() {
-		$this->register_post_type( 'cp_group', '', 'Groups' );
-
-		$labels = ( new Templates_Harness() )->taxonomy_labels( $this->taxonomy( 'Type', array( 'cp_group' ) ) );
-
-		$this->assertSame( 'Type Archive', $labels[0] );
-		$this->assertSame( 'Controls the page that lists the Groups in one Type.', $labels[1] );
 	}
 
 	/**

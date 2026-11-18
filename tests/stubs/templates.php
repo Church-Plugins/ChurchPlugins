@@ -119,3 +119,73 @@ if ( ! function_exists( 'wp_sprintf' ) ) {
 		return $items ? implode( ', ', $items ) . ' and ' . $last : (string) $last;
 	}
 }
+
+if ( ! function_exists( 'has_block' ) ) {
+	/**
+	 * Core's has_block() for a content string.
+	 */
+	function has_block( $block_name, $post = null ) {
+		$content = (string) $post;
+
+		if ( false === strpos( $content, '<!-- wp:' ) ) {
+			return false;
+		}
+
+		if ( false === strpos( $block_name, '/' ) ) {
+			$block_name = 'core/' . $block_name;
+		}
+
+		if ( 0 === strpos( $block_name, 'core/' ) ) {
+			$block_name = substr( $block_name, 5 );
+		}
+
+		return false !== strpos( $content, '<!-- wp:' . $block_name . ' ' );
+	}
+}
+
+if ( ! function_exists( 'add_filter' ) ) {
+	/**
+	 * Records the callback; cp_test_apply_added_filters() runs them in order.
+	 */
+	function add_filter( $hook, $callback, $priority = 10, $accepted_args = 1 ) {
+		$GLOBALS['cp_test_wp']['added_filters'][ $hook ][] = $callback;
+
+		return true;
+	}
+}
+
+if ( ! function_exists( 'add_action' ) ) {
+	function add_action( $hook, $callback, $priority = 10, $accepted_args = 1 ) {
+		return add_filter( $hook, $callback, $priority, $accepted_args );
+	}
+}
+
+if ( ! function_exists( 'get_option' ) ) {
+	function get_option( $option, $default_value = false ) {
+		return isset( $GLOBALS['cp_test_wp']['options'][ $option ] ) ? $GLOBALS['cp_test_wp']['options'][ $option ] : $default_value;
+	}
+}
+
+if ( ! function_exists( 'wp_is_block_theme' ) ) {
+	function wp_is_block_theme() {
+		return ! empty( $GLOBALS['cp_test_wp']['block_theme'] );
+	}
+}
+
+if ( ! function_exists( 'is_single' ) ) {
+	function is_single() {
+		return ! empty( $GLOBALS['cp_test_wp']['is_single'] );
+	}
+}
+
+if ( ! function_exists( 'is_404' ) ) {
+	function is_404() {
+		return ! empty( $GLOBALS['cp_test_wp']['is_404'] );
+	}
+}
+
+if ( ! function_exists( 'get_404_template' ) ) {
+	function get_404_template() {
+		return '/themes/test/404.php';
+	}
+}

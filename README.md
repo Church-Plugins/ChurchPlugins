@@ -41,20 +41,33 @@ Practical consequences:
   actually resolved (`Templates::resolved_block_template_overrides()`), not from a
   guessed slug. Fixes a sermon taxonomy page falling back to the theme's generic archive
   when `archive-cpl_item` was customized; customized `taxonomy-*` templates are now
-  honored; a customization saved under another theme no longer counts. The CP body
-  classes are added when deferring, including the ones a plugin adds in its own
-  `template_body_class()` override (`cpl-page-template`).
+  honored; a customization saved under another theme no longer counts. The framework's
+  body classes (`cp-template`, `cp-page-template`, the theme class) are added when
+  deferring, with whatever a plugin's own `template_body_class()` override adds. CP
+  Sermons' `cpl-page-template` is **not** among them, on any path, now or before: its
+  `Templates` class redeclares `protected static $template`, so its override reads a
+  copy the framework never writes. It prints `cpl-template`; the bare `page-template-`
+  class it used to print as well is now dropped on every path
+  (`Templates::strip_empty_template_class()`).
 * **Behavior change, legacy path only.** Two cases now keep the resolved template where
   1.1.21 replaced it with the plugin's view, matching what the handoff already does:
-  (1) a block theme that ships its own `single-{post_type}`, `archive-{post_type}` or
-  `taxonomy-{taxonomy}` template for a CP type, and (2) a post with a custom template
-  assigned in the editor. If that template has no `churchplugins/view` block, the
-  plugin's output no longer appears on the page. Add the "Church Plugins Content" block
-  to the template, or opt out so the plugin's view replaces it again:
+  (1) a theme that ships its own `single-{post_type}`, `archive-{post_type}` or
+  `taxonomy-{taxonomy}` block template for a CP type, and (2) a post whose custom
+  template, assigned in the editor, contains the `churchplugins/view` block. In case
+  (1), if that template has no `churchplugins/view` block, the plugin's output no longer
+  appears on the page. Add the "Church Plugins Content" block to the template, or opt
+  out so the plugin's view replaces it again:
   `add_filter( 'cp_template_block_template_overrides', '__return_false' );`
-  The filter receives the decision, the resolved `WP_Block_Template` (null before
-  WordPress 6.3), the `Templates` instance and the template path, so it can be narrowed
-  to one plugin or one template source.
+  The filter runs whenever core resolved a block template for the request, which
+  includes classic themes with a `theme.json` (assigned custom templates). It receives
+  the decision, the resolved `WP_Block_Template` (null before WordPress 6.3, and on 6.3+
+  when the recorded template cannot be loaded), the `Templates` instance and the
+  template path, so it can be narrowed to one plugin or one template source.
+* An assigned custom template without the view block does not defer: the plugin's view
+  replaces it, as on 1.1.21, because the block can only be inserted in the Site Editor.
+  Only the template's own content is checked; a view block inside a template part or a
+  pattern the template references is not seen (place it in the template, or return true
+  from the filter).
 * A request a plugin handles only through `cp_template_is_query` (not one of its own
   post types or taxonomies) no longer defers to a customized template on the legacy path.
 * WordPress 6.0 to 6.2 (no `$_wp_current_template_id`) keeps the 1.1.21 slug guess.
@@ -68,7 +81,8 @@ Practical consequences:
   name the post type. `Templates::get_plugin_name()` passes through the new
   `cp_template_plugin_name` filter (an override that skips `parent::` bypasses it).
 * Tests: `tests/Unit/TemplatesTest.php` covers the deferral rules, the handoff decision,
-  body classes and taxonomy template labels.
+  what `template_include()` returns and hooks on each path, the body classes printed
+  (also for a subclass shaped like CP Sermons') and taxonomy template labels.
 
 ### 1.1.19
 * Request action hardening: `Admin\_Init::request_actions()` applies stricter checks
