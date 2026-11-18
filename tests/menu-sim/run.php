@@ -436,16 +436,16 @@ class SimLicense {
 // How the released plugins register their screens.
 $defs = array(
 	'cp-library' => array(
-		'types'    => array( 'cpl_item' => 'Messages' ),
+		'types'    => array( 'cpl_item_type' => 'Series' ),
 		'subtypes' => array(
-			'cpl_item_type' => 'Series',
-			'cpl_speaker'   => 'Speakers',
+			'cpl_item'    => 'Messages',
+			'cpl_speaker' => 'Speakers',
 		),
 		'taxes'    => array( 'cpl_topic' => 'Topics' ),
-		'settings' => array( 'cpl_main_options', 'edit.php?post_type=cpl_item' ),
+		'settings' => array( 'cpl_main_options', 'edit.php?post_type=cpl_item_type' ),
 		'subpages' => array( 'cpl_item_options', 'cpl_advanced_options' ),
 		'license'  => 'cpl_license',
-		'extra'    => array( array( 'edit.php?post_type=cpl_item', 'Tools', 'manage_options', 'cp-library-tools' ) ),
+		'extra'    => array( array( 'edit.php?post_type=cpl_item_type', 'Tools', 'manage_options', 'cp-library-tools' ) ),
 	),
 	'cp-groups'  => array(
 		'types'    => array( 'cp_group' => 'Groups' ),
@@ -453,6 +453,12 @@ $defs = array(
 		'settings' => array( 'cp_groups_main_options', 'edit.php?post_type=cp_group' ),
 		'subpages' => array( 'cp_groups_advanced_options' ),
 		'license'  => 'cp_groups_license',
+	),
+	'cp-locations' => array(
+		'types'    => array( 'cploc_location' => 'Locations' ),
+		'settings' => array( 'cploc_main_options', 'edit.php?post_type=cploc_location' ),
+		'subpages' => array(),
+		'license'  => 'cploc_license',
 	),
 	'cp-staff'   => array(
 		'types'    => array( 'cp_staff' => 'Staff' ),

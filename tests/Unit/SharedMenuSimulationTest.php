@@ -50,10 +50,10 @@ class SharedMenuSimulationTest extends TestCase {
 	 */
 	const PRODUCTS = array(
 		'cp-library' => array(
-			'area'     => 'cpl_item',
+			'area'     => 'cpl_item_type',
 			'slot'     => 10,
 			'settings' => 'cpl_main_options',
-			'hook'     => 'cpl_item_page_cpl_main_options',
+			'hook'     => 'cpl_item_type_page_cpl_main_options',
 		),
 		'cp-groups'  => array(
 			'area'     => 'cp_group',
@@ -186,7 +186,7 @@ class SharedMenuSimulationTest extends TestCase {
 			$requests['sermons tools']            = array(
 				'pagenow' => 'edit.php',
 				'get'     => array(
-					'post_type' => 'cpl_item',
+					'post_type' => 'cpl_item_type',
 					'page'      => 'cp-library-tools',
 				),
 			);
@@ -398,7 +398,7 @@ class SharedMenuSimulationTest extends TestCase {
 			$this->assertSame( $options, $asked['sermons license tab']['access'], 'License tab' );
 
 			if ( $options ) {
-				$this->assertSame( 'cpl_item_page_cp-library-tools', $asked['sermons tools']['hook'] );
+				$this->assertSame( 'cpl_item_type_page_cp-library-tools', $asked['sermons tools']['hook'] );
 				$this->assertSame( 'admin_page_cpl_item_options', $asked['sermons settings sub-tab']['hook'] );
 				$this->assertSame( 'http://sim/wp-admin/admin.php?page=cp-licenses#cpl_license', $asked['sermons license tab']['redirect'] );
 			}
@@ -534,7 +534,7 @@ class SharedMenuSimulationTest extends TestCase {
 
 		$this->assertSame( 'admin.php?page=cpl_main_options', $result['settings_entry'] );
 		$this->assertSame(
-			array( 'edit.php?post_type=cpl_item', 'admin.php?page=cpl_main_options', 'cp-licenses' ),
+			array( 'edit.php?post_type=cpl_item_type', 'admin.php?page=cpl_main_options', 'cp-licenses' ),
 			array_column( $result['shared'], 'slug' )
 		);
 		$this->assertSame( array( true, true, true ), array_column( $result['shared'], 'can' ) );
@@ -548,7 +548,7 @@ class SharedMenuSimulationTest extends TestCase {
 		$result = self::simulate( $scenario + array( 'caps' => self::ROLES['editor'] ) );
 
 		$this->assertSame( '', $result['settings_entry'] );
-		$this->assertSame( array( 'edit.php?post_type=cpl_item' ), array_column( $result['shared'], 'slug' ) );
+		$this->assertSame( array( 'edit.php?post_type=cpl_item_type' ), array_column( $result['shared'], 'slug' ) );
 	}
 
 	/**
@@ -865,14 +865,14 @@ class SharedMenuSimulationTest extends TestCase {
 
 		$admin = self::simulate( $scenario + array( 'caps' => self::ROLES['administrator'] ) )['notice'];
 
-		$this->assertStringContainsString( 'Messages and Groups are now under Church Plugins', $admin );
+		$this->assertStringContainsString( 'Series and Groups are now under Church Plugins', $admin );
 		$this->assertStringContainsString( 'Church Plugins → Settings, and license keys under Church Plugins → Licenses.', $admin );
 		$this->assertStringContainsString( 'Your content, settings and saved links are unchanged.', $admin );
-		$this->assertStringContainsString( 'href="http://sim/wp-admin/edit.php?post_type=cpl_item"', $admin );
+		$this->assertStringContainsString( 'href="http://sim/wp-admin/edit.php?post_type=cpl_item_type"', $admin );
 
 		$editor = self::simulate( $scenario + array( 'caps' => self::ROLES['editor'] ) )['notice'];
 
-		$this->assertStringContainsString( 'Messages and Groups are now under Church Plugins', $editor );
+		$this->assertStringContainsString( 'Series and Groups are now under Church Plugins', $editor );
 		$this->assertStringNotContainsString( 'Settings', $editor );
 		$this->assertStringNotContainsString( 'Licenses', $editor );
 		$this->assertStringNotContainsString( 'license', $editor );
@@ -955,7 +955,7 @@ class SharedMenuSimulationTest extends TestCase {
 	 */
 	public function test_parent_page_redirects_for_one_plugin_and_for_two() {
 		$cases = array(
-			'one plugin'  => array(
+			'groups alone'    => array(
 				'products' => array( 'cp-groups' ),
 				'entries'  => array(
 					'edit.php?post_type=cp_group',
@@ -963,10 +963,19 @@ class SharedMenuSimulationTest extends TestCase {
 					'cp-licenses',
 				),
 			),
-			'two plugins' => array(
+			'locations alone' => array(
+				'products' => array( 'cp-locations' ),
+				'entries'  => array(
+					'edit.php?post_type=cploc_location',
+					'admin.php?page=cploc_main_options',
+					'cp-licenses',
+				),
+			),
+			'sermons'         => array(
 				'products' => array( 'cp-library', 'cp-groups' ),
 				'entries'  => array(
-					'edit.php?post_type=cpl_item',
+					// Expected entry mirrors CP Sermons' current menu order; a Messages-first order would be a separate CP Sermons change.
+					'edit.php?post_type=cpl_item_type',
 					'edit.php?post_type=cp_group',
 					'admin.php?page=cpl_main_options',
 					'cp-licenses',
