@@ -35,7 +35,15 @@
  *   settings_tabs    { key: tab }  tabs a host adds through `cp_admin_settings_tabs`.
  *   direct_entries   [ [ label, capability, slug ] ]  entries other code appends
  *                    to the shared menu's $submenu itself, with no capability check.
- *   requests         { name: { pagenow, get, typenow?, screen? } }
+ *   sermon_menu      'item_type'|'item'  CP Sermons top-level entry. `item_type`
+ *                    registers Series (cpl_item_type); `item` registers Messages
+ *                    (cpl_item). Omitted means `item_type`.
+ *   requests         { name: { pagenow, get, typenow?, screen?, tabs? } }
+ *                    `screen.block_editor` makes get_current_screen() report
+ *                    a block editor. `tabs` prints the tab bar, body class
+ *                    and inline styles for that screen. `dispatch` runs the
+ *                    plugin page the way wp-admin/admin.php does: `load-{$hook}`,
+ *                    then the admin header, then the page callback.
  *   render           string[]  'notice', 'licenses'.
  *
  * @package ChurchPlugins
@@ -79,6 +87,7 @@ $sc += array(
 	'settings_tabs'    => array(),
 	'requests'         => array(),
 	'render'           => array(),
+	'sermon_menu'      => 'item_type',
 );
 
 define( 'ABSPATH', __DIR__ . '/' );
@@ -91,6 +100,29 @@ define( 'CHURCHPLUGINS_VERSION', 'sim' );
  * Thrown in place of core ending the request (wp_die(), a redirect's exit).
  */
 class SimDie extends Exception {}
+
+/**
+ * Stand-in for WP_Screen. `block_editor` in the scenario makes
+ * is_block_editor() true.
+ */
+class SimScreen {
+	public $base = '';
+	public $post_type = '';
+	public $taxonomy = '';
+	public $block_editor = false;
+
+	public function __construct( array $screen ) {
+		foreach ( $screen as $key => $value ) {
+			if ( property_exists( $this, $key ) ) {
+				$this->$key = $value;
+			}
+		}
+	}
+
+	public function is_block_editor() {
+		return (bool) $this->block_editor;
+	}
+}
 
 $GLOBALS['sim_caps']         = array_fill_keys( $sc['caps'], true );
 $GLOBALS['sim_options']      = $sc['options'];
@@ -155,7 +187,9 @@ function add_query_arg( ...$a ) {
 }
 function wp_nonce_url( $u, $a ) { return $u . ( false === strpos( $u, '?' ) ? '?' : '&' ) . '_wpnonce=nonce'; }
 function wp_create_nonce( $a ) { return 'nonce'; }
-function wp_add_inline_style() {}
+function wp_add_inline_style( $handle = '', $data = '' ) {
+	$GLOBALS['sim_styles'][] = array( (string) $handle, (string) $data );
+}
 function wp_add_inline_script() {}
 function wp_enqueue_script() {}
 function get_plugin_data() { return array(); }
@@ -406,16 +440,16 @@ class SimLicense {
 // How the released plugins register their screens.
 $defs = array(
 	'cp-library' => array(
-		'types'    => array( 'cpl_item' => 'Messages' ),
+		'types'    => array( 'cpl_item_type' => 'Series' ),
 		'subtypes' => array(
-			'cpl_item_type' => 'Series',
-			'cpl_speaker'   => 'Speakers',
+			'cpl_item'    => 'Messages',
+			'cpl_speaker' => 'Speakers',
 		),
 		'taxes'    => array( 'cpl_topic' => 'Topics' ),
-		'settings' => array( 'cpl_main_options', 'edit.php?post_type=cpl_item' ),
+		'settings' => array( 'cpl_main_options', 'edit.php?post_type=cpl_item_type' ),
 		'subpages' => array( 'cpl_item_options', 'cpl_advanced_options' ),
 		'license'  => 'cpl_license',
-		'extra'    => array( array( 'edit.php?post_type=cpl_item', 'Tools', 'manage_options', 'cp-library-tools' ) ),
+		'extra'    => array( array( 'edit.php?post_type=cpl_item_type', 'Tools', 'manage_options', 'cp-library-tools' ) ),
 	),
 	'cp-groups'  => array(
 		'types'    => array( 'cp_group' => 'Groups' ),
@@ -423,6 +457,12 @@ $defs = array(
 		'settings' => array( 'cp_groups_main_options', 'edit.php?post_type=cp_group' ),
 		'subpages' => array( 'cp_groups_advanced_options' ),
 		'license'  => 'cp_groups_license',
+	),
+	'cp-locations' => array(
+		'types'    => array( 'cploc_location' => 'Locations' ),
+		'settings' => array( 'cploc_main_options', 'edit.php?post_type=cploc_location' ),
+		'subpages' => array(),
+		'license'  => 'cploc_license',
 	),
 	'cp-staff'   => array(
 		'types'    => array( 'cp_staff' => 'Staff' ),
@@ -443,6 +483,18 @@ $defs = array(
 		'sync'    => true,
 	),
 );
+
+// `default_menu_item=item` registers Messages as the top-level entry.
+// `item_type` (the fixture used above) registers Series.
+if ( 'item' === $sc['sermon_menu'] ) {
+	$defs['cp-library']['types']      = array( 'cpl_item' => 'Messages' );
+	$defs['cp-library']['subtypes']   = array(
+		'cpl_item_type' => 'Series',
+		'cpl_speaker'   => 'Speakers',
+	);
+	$defs['cp-library']['settings'][1] = 'edit.php?post_type=cpl_item';
+	$defs['cp-library']['extra'][0][0] = 'edit.php?post_type=cpl_item';
+}
 
 foreach ( $sc['products'] as $key ) {
 	$d = $defs[ $key ];
@@ -686,7 +738,7 @@ foreach ( array( '' => array( 'pagenow' => 'index.php', 'get' => array() ) ) + $
 		$plugin_page = null;
 	}
 
-	$GLOBALS['sim_screen'] = isset( $request['screen'] ) ? (object) $request['screen'] : null;
+	$GLOBALS['sim_screen'] = isset( $request['screen'] ) ? new SimScreen( $request['screen'] ) : null;
 
 	$result = array( 'access' => user_can_access_admin_page() );
 
@@ -709,6 +761,54 @@ foreach ( array( '' => array( 'pagenow' => 'index.php', 'get' => array() ) ) + $
 		$submenu_file        = apply_filters( 'submenu_file', null, $parent_file );
 		$result['highlight'] = array( $parent_file, $submenu_file );
 		do_action( 'adminmenu' );
+	}
+
+	if ( ! empty( $request['tabs'] ) ) {
+		$GLOBALS['sim_styles'] = array();
+		ob_start();
+		$shared_menu->tabs();
+		$result['tabs']       = ob_get_clean();
+		$result['body_class'] = $shared_menu->body_class( 'wp-admin' );
+		$shared_menu->styles();
+		$result['styles'] = $GLOBALS['sim_styles'];
+	}
+
+	// wp-admin/admin.php includes admin-header.php after load-{$hook} and
+	// before the page callback. A page with no callback is included as a
+	// plugin file, which dies with "Cannot load %s."
+	if ( ! empty( $request['dispatch'] ) && isset( $plugin_page ) && ! isset( $result['redirect'] ) ) {
+		if ( empty( $result['access'] ) ) {
+			$result['die'] = 'Sorry, you are not allowed to access this page.';
+		} elseif ( ! empty( $result['hook'] ) ) {
+			$result['output']      = '';
+			$result['header_sent'] = false;
+			$buffers               = ob_get_level();
+
+			try {
+				do_action( 'load-' . $result['hook'] );
+				$result['header_sent'] = true;
+				$result['output']      = '<div id="wpbody">';
+				ob_start();
+				do_action( $result['hook'] );
+				$result['output']    .= ob_get_clean();
+				$result['dispatched'] = true;
+			} catch ( SimDie $e ) {
+				while ( ob_get_level() > $buffers ) {
+					$result['output'] .= ob_get_clean();
+				}
+
+				$message = $e->getMessage();
+
+				if ( 0 === strpos( $message, 'REDIRECT ' ) ) {
+					$result['redirect']    = substr( $message, 9 );
+					$result['redirect_at'] = $result['header_sent'] ? 'callback' : 'load';
+				} else {
+					$result['die'] = $message;
+				}
+			}
+		} else {
+			$result['die'] = 'Cannot load ' . htmlentities( $plugin_page ) . '.';
+		}
 	}
 
 	if ( '' !== $name ) {
