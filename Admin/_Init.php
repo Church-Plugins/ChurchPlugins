@@ -47,8 +47,17 @@ class _Init {
 	protected function includes() {
 		require_once( CHURCHPLUGINS_DIR . 'Admin/Import/_Init.php' );
 		require_once( CHURCHPLUGINS_DIR . 'Admin/Options.php' );
+		require_once( CHURCHPLUGINS_DIR . 'Admin/MenuLayout.php' );
 		require_once( CHURCHPLUGINS_DIR . 'Admin/Menu.php' );
+		require_once( CHURCHPLUGINS_DIR . 'Admin/Licenses.php' );
+		require_once( CHURCHPLUGINS_DIR . 'Admin/MenuNotice.php' );
 		$this->import = Import\_Init::get_instance();
+
+		// The shared "Church Plugins" menu, the Licenses screen and the
+		// one-time "menus moved" notice (since 1.1.23).
+		Menu::get_instance();
+		Licenses::get_instance();
+		MenuNotice::get_instance();
 	}
 
 	protected function actions() {
