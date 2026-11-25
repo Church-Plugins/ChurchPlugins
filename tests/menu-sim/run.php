@@ -35,6 +35,9 @@
  *   settings_tabs    { key: tab }  tabs a host adds through `cp_admin_settings_tabs`.
  *   direct_entries   [ [ label, capability, slug ] ]  entries other code appends
  *                    to the shared menu's $submenu itself, with no capability check.
+ *   sermon_menu      'item_type'|'item'  CP Sermons top-level entry. `item_type`
+ *                    registers Series (cpl_item_type); `item` registers Messages
+ *                    (cpl_item). Omitted means `item_type`.
  *   requests         { name: { pagenow, get, typenow?, screen?, tabs? } }
  *                    `screen.block_editor` makes get_current_screen() report
  *                    a block editor. `tabs` prints the tab bar, body class
@@ -84,6 +87,7 @@ $sc += array(
 	'settings_tabs'    => array(),
 	'requests'         => array(),
 	'render'           => array(),
+	'sermon_menu'      => 'item_type',
 );
 
 define( 'ABSPATH', __DIR__ . '/' );
@@ -479,6 +483,18 @@ $defs = array(
 		'sync'    => true,
 	),
 );
+
+// `default_menu_item=item` registers Messages as the top-level entry.
+// `item_type` (the fixture used above) registers Series.
+if ( 'item' === $sc['sermon_menu'] ) {
+	$defs['cp-library']['types']      = array( 'cpl_item' => 'Messages' );
+	$defs['cp-library']['subtypes']   = array(
+		'cpl_item_type' => 'Series',
+		'cpl_speaker'   => 'Speakers',
+	);
+	$defs['cp-library']['settings'][1] = 'edit.php?post_type=cpl_item';
+	$defs['cp-library']['extra'][0][0] = 'edit.php?post_type=cpl_item';
+}
 
 foreach ( $sc['products'] as $key ) {
 	$d = $defs[ $key ];

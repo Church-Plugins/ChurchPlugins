@@ -878,6 +878,17 @@ class SharedMenuSimulationTest extends TestCase {
 		$this->assertStringNotContainsString( 'license', $editor );
 		$this->assertStringContainsString( 'Your content and saved links are unchanged.', $editor );
 
+		// default_menu_item=item: Messages is the top-level entry.
+		$messages = self::simulate(
+			$scenario + array(
+				'caps'        => self::ROLES['administrator'],
+				'sermon_menu' => 'item',
+			)
+		)['notice'];
+
+		$this->assertStringContainsString( 'Messages and Groups are now under Church Plugins', $messages, 'default_menu_item=item' );
+		$this->assertStringContainsString( 'href="http://sim/wp-admin/edit.php?post_type=cpl_item"', $messages, 'default_menu_item=item' );
+
 		// Settings but no content screens: no area is named.
 		$options = self::simulate( $scenario + array( 'caps' => self::ROLES['options-only'] ) )['notice'];
 
@@ -971,11 +982,23 @@ class SharedMenuSimulationTest extends TestCase {
 					'cp-licenses',
 				),
 			),
-			'sermons'         => array(
-				'products' => array( 'cp-library', 'cp-groups' ),
-				'entries'  => array(
-					// Expected entry mirrors CP Sermons' current menu order; a Messages-first order would be a separate CP Sermons change.
+			'sermons, item_type' => array(
+				'sermon_menu' => 'item_type',
+				'products'    => array( 'cp-library', 'cp-groups' ),
+				'entries'     => array(
+					// default_menu_item=item_type: Series is the top-level entry.
 					'edit.php?post_type=cpl_item_type',
+					'edit.php?post_type=cp_group',
+					'admin.php?page=cpl_main_options',
+					'cp-licenses',
+				),
+			),
+			'sermons, item'      => array(
+				'sermon_menu' => 'item',
+				'products'    => array( 'cp-library', 'cp-groups' ),
+				'entries'     => array(
+					// default_menu_item=item: Messages is the top-level entry.
+					'edit.php?post_type=cpl_item',
 					'edit.php?post_type=cp_group',
 					'admin.php?page=cpl_main_options',
 					'cp-licenses',
@@ -984,19 +1007,23 @@ class SharedMenuSimulationTest extends TestCase {
 		);
 
 		foreach ( $cases as $label => $case ) {
-			$result = self::simulate(
-				array(
-					'caps'     => self::ROLES['administrator'],
-					'products' => $case['products'],
-					'requests' => array(
-						'parent' => array(
-							'pagenow'  => 'admin.php',
-							'get'      => array( 'page' => 'church-plugins' ),
-							'dispatch' => true,
-						),
+			$scenario = array(
+				'caps'     => self::ROLES['administrator'],
+				'products' => $case['products'],
+				'requests' => array(
+					'parent' => array(
+						'pagenow'  => 'admin.php',
+						'get'      => array( 'page' => 'church-plugins' ),
+						'dispatch' => true,
 					),
-				)
+				),
 			);
+
+			if ( isset( $case['sermon_menu'] ) ) {
+				$scenario['sermon_menu'] = $case['sermon_menu'];
+			}
+
+			$result = self::simulate( $scenario );
 
 			$this->assertSame( $case['entries'], array_column( $result['shared'], 'slug' ), $label );
 			$this->assertSame( $case['entries'][0], $result['top_link']['slug'], $label );
