@@ -353,7 +353,7 @@ class MenuNotice {
 				__( '%s are now under Church Plugins in the admin menu.', 'churchplugins' ),
 				$what
 			),
-			__( 'Related screens and settings are now under Church Plugins.', 'churchplugins' ),
+			__( 'Related screens are tabs across the top of each screen.', 'churchplugins' ),
 		);
 
 		if ( $settings && $licenses ) {
