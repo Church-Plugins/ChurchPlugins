@@ -15,7 +15,7 @@ If you cannot find a download, the Downloads tab includes this line: "Can't find
 Church Plugins are not listed in the WordPress plugin search. Install each one from its zip file.
 
 1. Log in to your WordPress dashboard.
-2. Go to Plugins → Add Plugin → Upload Plugin.
+2. Go to Plugins → Add New Plugin → Upload Plugin.
 3. Choose the zip file and click Install Now. Do not unzip the file first.
 4. After the install finishes, click Activate Plugin.
 5. Repeat for each plugin you downloaded.
@@ -44,7 +44,7 @@ For CP Sync, the buttons work a little differently:
 
 | Plugin | Go to |
 |---|---|
-| CP Sermons | Series → Settings → License. If Series is turned off, use Messages → Settings → License. |
+| CP Sermons | Series → Settings → License. If your sermons menu starts with Messages (or Series is turned off), use Messages → Settings → License. |
 | CP Groups | Groups → Settings → License |
 | CP Staff | Staff → Settings → License |
 | CP Live | Settings → CP Live → License |
