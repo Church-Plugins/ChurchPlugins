@@ -350,9 +350,10 @@ class MenuNotice {
 		$message  = array(
 			sprintf(
 				/* translators: %s: list of screens, such as "Messages, Groups and Staff". */
-				__( '%s are now under Church Plugins in the admin menu. Related screens, like categories and speakers, are tabs across the top of each screen.', 'churchplugins' ),
+				__( '%s are now under Church Plugins in the admin menu.', 'churchplugins' ),
 				$what
 			),
+			__( 'Related screens and settings are now under Church Plugins.', 'churchplugins' ),
 		);
 
 		if ( $settings && $licenses ) {
